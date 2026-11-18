@@ -10,12 +10,18 @@
  */
 import { cache } from "react";
 import { apiUrl } from "./api-url";
-import type { Project, ResolvedProject, SiteContent } from "./types";
+import { withCompanyDefaults } from "./company";
+import type { AboutContent, FooterContent, HomeContent, Project, ResolvedProject, SiteContent } from "./types";
 
 export const CONTENT_TAG = "content";
 const REVALIDATE_SECONDS = 300;
 
-const FALLBACK_CONTENT: SiteContent = {
+/** Base fallbacks for the original CMS fields; company-profile fields come from lib/company.ts. */
+const FALLBACK_CONTENT: {
+    home: Omit<HomeContent, "aboutPhoto">;
+    about: Pick<AboutContent, "title" | "subtitle" | "description" | "mission" | "stats">;
+    footer: Pick<FooterContent, "description" | "address" | "email" | "phone" | "social">;
+} = {
     home: {
         hero: {
             title: "GRP & Associates Ltd",
@@ -32,8 +38,6 @@ const FALLBACK_CONTENT: SiteContent = {
     },
     about: { title: "About GPRSI", subtitle: "", description: "", mission: "", stats: { staff: "", experience: "", vessels: "", provinces: "" } },
     footer: { description: "", address: "", email: "", phone: "", social: [] },
-    services: [],
-    projects: [],
 };
 
 function slugify(text: string): string {
@@ -59,17 +63,20 @@ const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 /** Merges a possibly partial/malformed payload over the fallback, one section at a time. */
 function normalize(raw: unknown): SiteContent {
-    const data = obj(raw);
+    const data = withCompanyDefaults(obj(raw));
     const home = obj(data.home);
+    const about = obj(data.about);
     const F = FALLBACK_CONTENT;
     return {
         home: {
+            ...(home as Pick<HomeContent, "aboutPhoto">),
             hero: { ...F.home.hero, ...obj(home.hero), buttons: { ...F.home.hero.buttons, ...obj(obj(home.hero).buttons) } },
             cta: { ...F.home.cta, ...obj(home.cta) },
         },
-        about: { ...F.about, ...obj(data.about), stats: { ...F.about.stats, ...obj(obj(data.about).stats) } },
-        footer: { ...F.footer, ...obj(data.footer), social: arr(obj(data.footer).social) },
+        about: { ...F.about, ...(about as unknown as AboutContent), stats: { ...F.about.stats, ...obj(about.stats) } },
+        footer: { ...F.footer, ...(obj(data.footer) as unknown as FooterContent), social: arr(obj(data.footer).social) },
         services: arr<SiteContent["services"][number]>(data.services).map((s) => ({ ...s, features: arr<string>(s.features) })),
+        servicesPage: data.servicesPage as SiteContent["servicesPage"],
         projects: resolveProjects(arr<Project>(data.projects).filter((p) => p && p.title)),
     };
 }
@@ -85,7 +92,7 @@ export const getContent = cache(async (): Promise<SiteContent> => {
         return normalize(await res.json());
     } catch (err) {
         console.error("[content] falling back to defaults:", err instanceof Error ? err.message : err);
-        return FALLBACK_CONTENT;
+        return normalize({});
     }
 });
 

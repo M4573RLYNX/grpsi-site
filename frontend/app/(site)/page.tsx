@@ -6,7 +6,6 @@ import CtaBand from "@/components/CtaBand";
 import ProjectCard from "@/components/ProjectCard";
 import Reveal from "@/components/Reveal";
 import SafeImage from "@/components/SafeImage";
-import { PHOTOS } from "@/lib/company";
 import { ServiceCard } from "@/components/Services";
 import { Button, Container, IconBadge, SectionHeading, cn, surface } from "@/components/ui";
 
@@ -26,12 +25,14 @@ export default async function HomePage() {
             {(about.description || about.mission) && (
                 <section className="py-20 sm:py-28">
                     <Container>
-                        <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 items-center">
-                            <Reveal>
-                                <div className={cn(surface.media, "aspect-[4/3] shadow-float")}>
-                                    <SafeImage src={PHOTOS.bulkEarthworks.src} alt={PHOTOS.bulkEarthworks.alt} sizes="(min-width: 1024px) 560px, 100vw" />
-                                </div>
-                            </Reveal>
+                        <div className={cn("grid gap-10 lg:gap-16 items-center", home.aboutPhoto.src && "lg:grid-cols-2")}>
+                            {home.aboutPhoto.src && (
+                                <Reveal>
+                                    <div className={cn(surface.media, "aspect-[4/3] shadow-float")}>
+                                        <SafeImage src={home.aboutPhoto.src} alt={home.aboutPhoto.alt} sizes="(min-width: 1024px) 560px, 100vw" />
+                                    </div>
+                                </Reveal>
+                            )}
                             <Reveal delay={0.1}>
                                 <SectionHeading eyebrow={about.subtitle || "Who we are"} title={about.title} description={about.description} />
                                 {about.mission && (

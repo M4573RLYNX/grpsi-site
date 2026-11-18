@@ -4,174 +4,39 @@ import { Suspense, useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiUrl } from "@/lib/api-url";
+import { withCompanyDefaults } from "@/lib/company";
 import {
-    Save, RefreshCw, Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Globe, Briefcase, FileText,
-    Settings, Upload, Image as ImageIcon, Ship, Users, Link2, BookOpen, Target, Lightbulb, Trophy,
+    RefreshCw, Trash2, Loader2, CheckCircle2, AlertCircle, Globe, Briefcase, FileText,
+    Settings, Image as ImageIcon, Ship, Users, Link2, BookOpen, Target, Lightbulb, Trophy,
     ChevronDown, House, Sparkles, MousePointerClick, Megaphone, BarChart3, Mail, MapPin, Phone,
-    ExternalLink, X, Layers, Share2,
+    ExternalLink, X, Layers, Share2, Save, Plus, BadgeInfo, UserRound, ShieldCheck, Images, Heading,
+    ListChecks, Wrench, Handshake, Building2,
 } from "lucide-react";
+import { AddButton, Field, IconButton, ImageUploader, SectionCard, TextArea, TextInput, inputCls } from "./_components/fields";
+import {
+    EquipmentGroupsEditor, FactsEditor, IconCardsEditor, PeopleEditor, PhotoEditor, PhotoListEditor, StringListEditor,
+} from "./_components/list-editors";
 
 /* ------------------------------------------------------------------ */
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
 
-const TABS: Record<string, { title: string; description: string; icon: any; collection: string; viewHref: string }> = {
-    home: { title: "Landing Page", description: "Hero banner, call-to-action buttons and contact strip shown on the homepage.", icon: House, collection: "home", viewHref: "/" },
-    about: { title: "About Page", description: "Company story, headline and the key metrics shown across the site.", icon: FileText, collection: "about", viewHref: "/about" },
-    services: { title: "Services", description: "The service lines you offer, with imagery and capability lists.", icon: Ship, collection: "services", viewHref: "/services" },
-    projects: { title: "Projects", description: "Portfolio entries and their case-study pages.", icon: Briefcase, collection: "projects", viewHref: "/projects" },
-    footer: { title: "Global Settings", description: "Contact details, footer copy and social links used on every page.", icon: Settings, collection: "footer", viewHref: "/" },
+/** Each tab edits (and publishes) one or more top-level content collections. */
+const TABS: Record<string, { title: string; description: string; icon: any; collections: string[]; viewHref: string }> = {
+    home: { title: "Landing Page", description: "Hero banner, call-to-action buttons and contact strip shown on the homepage.", icon: House, collections: ["home"], viewHref: "/" },
+    about: { title: "About Page", description: "Company story, facts, leadership team, commitments and photos.", icon: FileText, collections: ["about"], viewHref: "/about" },
+    services: { title: "Services", description: "Services page content: capabilities, delivery, equipment, partners and your core service lines.", icon: Ship, collections: ["servicesPage", "services"], viewHref: "/services" },
+    projects: { title: "Projects", description: "Portfolio entries and their case-study pages.", icon: Briefcase, collections: ["projects"], viewHref: "/projects" },
+    footer: { title: "Global Settings", description: "Contact details, company details, footer copy and social links used on every page.", icon: Settings, collections: ["footer"], viewHref: "/" },
 };
+
+const ARRAY_COLLECTIONS = new Set(["services", "projects"]);
 
 /** Asks the public site to drop its cached content so the publish shows up immediately. */
 const refreshPublicSite = (token: string | null) =>
     fetch("/api/revalidate", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {
         // Non-fatal: the public site also refreshes on its own every 5 minutes.
     });
-
-/* ------------------------------------------------------------------ */
-/* UI primitives                                                       */
-/* ------------------------------------------------------------------ */
-
-const inputCls =
-    "w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-300 outline-none transition-all hover:border-slate-300 focus:border-grpsi-blue focus:ring-4 focus:ring-grpsi-blue/10";
-
-function Field({ label, hint, icon: Icon, className = "", children }: { label: string; hint?: string; icon?: any; className?: string; children: React.ReactNode }) {
-    return (
-        <label className={`block space-y-2 ${className}`}>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
-                {label}
-            </span>
-            {children}
-            {hint && <span className="block text-[11px] text-slate-400">{hint}</span>}
-        </label>
-    );
-}
-
-function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-    return <input type="text" {...props} value={props.value ?? ""} className={`${inputCls} ${props.className ?? ""}`} />;
-}
-
-function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-    return <textarea rows={3} {...props} value={props.value ?? ""} className={`${inputCls} resize-y leading-relaxed ${props.className ?? ""}`} />;
-}
-
-function SectionCard({ icon: Icon, title, description, action, children }: { icon: any; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
-    return (
-        <section className="bg-white/80 backdrop-blur rounded-[28px] ring-1 ring-slate-200/70 shadow-premium p-6 sm:p-8">
-            <header className="flex items-start gap-4 mb-6">
-                <div className="h-10 w-10 shrink-0 rounded-2xl bg-grpsi-blue/5 text-grpsi-blue flex items-center justify-center">
-                    <Icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900">{title}</h3>
-                    {description && <p className="text-sm text-slate-500 mt-0.5">{description}</p>}
-                </div>
-                {action}
-            </header>
-            <div className="space-y-5">{children}</div>
-        </section>
-    );
-}
-
-function IconButton({ onClick, label, danger, children }: { onClick: () => void; label: string; danger?: boolean; children: React.ReactNode }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            title={label}
-            aria-label={label}
-            className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center transition-all ${
-                danger ? "text-slate-400 hover:text-red-500 hover:bg-red-50" : "text-slate-400 hover:text-grpsi-blue hover:bg-slate-100"
-            }`}
-        >
-            {children}
-        </button>
-    );
-}
-
-function AddButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="w-full flex items-center justify-center gap-2 py-5 rounded-[24px] border-2 border-dashed border-slate-200 text-slate-500 font-semibold text-sm hover:border-grpsi-blue hover:text-grpsi-blue hover:bg-white/60 transition-all"
-        >
-            <Plus className="w-4 h-4" />
-            {children}
-        </button>
-    );
-}
-
-function ImageUploader({ label, currentUrl, onUpload, onError }: { label: string; currentUrl: string; onUpload: (url: string) => void; onError: (msg: string) => void }) {
-    const [uploading, setUploading] = useState(false);
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        e.target.value = "";
-        if (!file) return;
-
-        setUploading(true);
-        try {
-            const token = localStorage.getItem("gprsi_admin_token");
-            const response = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": file.type || "application/octet-stream" },
-                body: file,
-            });
-            if (response.ok) {
-                const blob = await response.json();
-                onUpload(blob.url);
-            } else if (response.status === 401) {
-                onError("Your session has expired. Log out and log in again to upload images.");
-            } else {
-                const err = await response.json().catch(() => ({}));
-                onError(`Upload failed: ${err.error || "Server error"}`);
-            }
-        } catch {
-            onError("Connection error during upload.");
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    return (
-        <div className="space-y-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
-                {label}
-            </span>
-            <div className="flex flex-col sm:flex-row gap-4 p-3 rounded-2xl bg-slate-50 ring-1 ring-slate-200/70">
-                <div className="relative w-full sm:w-40 aspect-video sm:aspect-auto sm:h-24 rounded-xl overflow-hidden bg-white ring-1 ring-slate-200 flex items-center justify-center shrink-0">
-                    {currentUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={currentUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                        <ImageIcon className="w-6 h-6 text-slate-300" />
-                    )}
-                    {uploading && (
-                        <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 animate-spin text-grpsi-blue" />
-                        </div>
-                    )}
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
-                    <label
-                        className={`inline-flex w-fit items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                            uploading ? "bg-slate-100 text-slate-400 pointer-events-none" : "bg-white ring-1 ring-slate-200 text-slate-700 hover:ring-grpsi-blue hover:text-grpsi-blue"
-                        }`}
-                    >
-                        <Upload className="w-4 h-4" />
-                        {uploading ? "Uploading…" : currentUrl ? "Replace image" : "Upload image"}
-                        <input type="file" accept="image/*" onChange={handleFileChange} className="sr-only" disabled={uploading} />
-                    </label>
-                    {currentUrl && <p className="text-[11px] font-mono text-slate-400 truncate" title={currentUrl}>{currentUrl}</p>}
-                </div>
-            </div>
-        </div>
-    );
-}
 
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
@@ -226,7 +91,9 @@ function AdminEditor() {
         try {
             const res = await fetch(apiUrl("/content"));
             if (!res.ok) throw new Error();
-            const data = await res.json();
+            // Fill not-yet-saved company-profile fields with the site's defaults, so the
+            // editors show exactly what the public site currently displays.
+            const data = withCompanyDefaults(await res.json());
             setContent(data);
             setSaved(data);
         } catch {
@@ -236,28 +103,40 @@ function AdminEditor() {
         }
     };
 
-    const handleSave = async (collection: string, updatedData: any) => {
+    const dirtyCollections = useMemo(() => {
+        if (!content || !saved) return [];
+        return tab.collections.filter((c) => JSON.stringify(content[c]) !== JSON.stringify(saved[c]));
+    }, [content, saved, tab.collections]);
+    const isDirty = dirtyCollections.length > 0;
+
+    /** Publishes every changed collection on the current tab, then refreshes the public site once. */
+    const handleSave = async () => {
         setIsSaving(true);
         setToast(null);
         const token = localStorage.getItem("gprsi_admin_token");
 
         try {
-            const res = await fetch(apiUrl("/admin/update"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ collection, fullCollection: updatedData }),
-            });
+            for (const collection of dirtyCollections) {
+                const updatedData = content[collection] ?? (ARRAY_COLLECTIONS.has(collection) ? [] : {});
+                const res = await fetch(apiUrl("/admin/update"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ collection, fullCollection: updatedData }),
+                });
 
-            if (res.ok) {
+                if (res.status === 403 || res.status === 401) {
+                    showError("Your session has expired. Log out and log in again to continue.");
+                    return;
+                }
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    showError(errData.error || "Update failed.");
+                    return;
+                }
                 setSaved((prev: any) => ({ ...prev, [collection]: updatedData }));
-                refreshPublicSite(token);
-                setToast({ type: "success", message: "Changes published to the live site." });
-            } else if (res.status === 403 || res.status === 401) {
-                showError("Your session has expired. Log out and log in again to continue.");
-            } else {
-                const errData = await res.json().catch(() => ({}));
-                showError(errData.error || "Update failed.");
             }
+            refreshPublicSite(token);
+            setToast({ type: "success", message: "Changes published to the live site." });
         } catch (err: any) {
             console.error("Save failed:", err);
             const detail = err?.name === "TypeError" ? " (possible CORS/network issue)" : "";
@@ -267,12 +146,8 @@ function AdminEditor() {
         }
     };
 
-    const isDirty = useMemo(() => {
-        if (!content || !saved) return false;
-        return JSON.stringify(content[tab.collection]) !== JSON.stringify(saved[tab.collection]);
-    }, [content, saved, tab.collection]);
-
-    const discardChanges = () => setContent((prev: any) => ({ ...prev, [tab.collection]: saved[tab.collection] }));
+    const discardChanges = () =>
+        setContent((prev: any) => ({ ...prev, ...Object.fromEntries(tab.collections.map((c) => [c, saved[c]])) }));
 
     // Deep update helper: updateDeep(['home','hero','title'], value)
     const updateDeep = (path: string[], value: any) => {
@@ -419,6 +294,13 @@ function AdminEditor() {
                                 <TextInput value={content.home.cta?.phone} onChange={(e) => updateDeep(["home", "cta", "phone"], e.target.value)} />
                             </Field>
                         </div>
+                        <Field label="CTA description" hint="Also shown at the bottom of the About, Services and Projects pages.">
+                            <TextArea rows={2} value={content.home.cta?.description} onChange={(e) => updateDeep(["home", "cta", "description"], e.target.value)} />
+                        </Field>
+                    </SectionCard>
+
+                    <SectionCard icon={ImageIcon} title="Who we are photo" description="Shown beside the company summary on the homepage.">
+                        <PhotoEditor label="Photo" photo={content.home.aboutPhoto} onChange={(p) => updateDeep(["home", "aboutPhoto"], p)} onError={showError} />
                     </SectionCard>
                 </>
             )}
@@ -435,9 +317,16 @@ function AdminEditor() {
                                 <TextInput value={content.about.subtitle} onChange={(e) => updateDeep(["about", "subtitle"], e.target.value)} />
                             </Field>
                         </div>
-                        <Field label="Full description">
+                        <Field label="Full description" hint="Leave empty to show the company background from the capability statement.">
                             <TextArea rows={7} value={content.about.description} onChange={(e) => updateDeep(["about", "description"], e.target.value)} />
                         </Field>
+                        <Field label="Mission statement">
+                            <TextArea rows={3} value={content.about.mission} onChange={(e) => updateDeep(["about", "mission"], e.target.value)} />
+                        </Field>
+                    </SectionCard>
+
+                    <SectionCard icon={BadgeInfo} title="Company facts" description="The facts strip under the story (e.g. established, ownership, business number).">
+                        <FactsEditor facts={content.about.facts} onChange={(v) => updateDeep(["about", "facts"], v)} />
                     </SectionCard>
 
                     <SectionCard icon={BarChart3} title="Key metrics" description="Shown as highlight figures on the site.">
@@ -460,6 +349,99 @@ function AdminEditor() {
                             ))}
                         </div>
                     </SectionCard>
+
+                    <SectionCard icon={UserRound} title="Leadership & key personnel" description="Remove everyone to hide this section.">
+                        <Field label="Introduction">
+                            <TextArea rows={3} value={content.about.leadershipIntro} onChange={(e) => updateDeep(["about", "leadershipIntro"], e.target.value)} />
+                        </Field>
+                        <PeopleEditor people={content.about.leadership} onChange={(v) => updateDeep(["about", "leadership"], v)} />
+                    </SectionCard>
+
+                    <SectionCard icon={ShieldCheck} title="Safety, quality, community & local development" description="Commitment cards and the closing commitment statement.">
+                        <IconCardsEditor cards={content.about.commitments} onChange={(v) => updateDeep(["about", "commitments"], v)} addLabel="Add commitment" />
+                        <Field label="Our commitment statement">
+                            <TextArea rows={3} value={content.about.commitmentStatement} onChange={(e) => updateDeep(["about", "commitmentStatement"], e.target.value)} />
+                        </Field>
+                    </SectionCard>
+
+                    <SectionCard icon={Images} title="Page photos">
+                        <div className="grid lg:grid-cols-3 gap-5">
+                            {([
+                                ["story", "Beside the story"],
+                                ["leadership", "Leadership grid"],
+                                ["commitment", "Commitment statement"],
+                            ] as const).map(([key, label]) => (
+                                <PhotoEditor
+                                    key={key}
+                                    label={label}
+                                    photo={content.about.photos[key]}
+                                    onChange={(p) => updateDeep(["about", "photos", key], p)}
+                                    onError={showError}
+                                />
+                            ))}
+                        </div>
+                    </SectionCard>
+                </>
+            )}
+
+            {/* SERVICES PAGE CONTENT */}
+            {activeTab === "services" && content.servicesPage && (
+                <>
+                    <SectionCard icon={Heading} title="Page header" description="The headline at the top of the Services page.">
+                        <Field label="Eyebrow" hint="Small label above the title.">
+                            <TextInput value={content.servicesPage.header.eyebrow} onChange={(e) => updateDeep(["servicesPage", "header", "eyebrow"], e.target.value)} />
+                        </Field>
+                        <Field label="Title">
+                            <TextInput value={content.servicesPage.header.title} onChange={(e) => updateDeep(["servicesPage", "header", "title"], e.target.value)} />
+                        </Field>
+                        <Field label="Description">
+                            <TextArea rows={2} value={content.servicesPage.header.description} onChange={(e) => updateDeep(["servicesPage", "header", "description"], e.target.value)} />
+                        </Field>
+                    </SectionCard>
+
+                    <SectionCard icon={Layers} title="Capabilities" description="The capability cards at the top of the page.">
+                        <IconCardsEditor cards={content.servicesPage.capabilities} onChange={(v) => updateDeep(["servicesPage", "capabilities"], v)} addLabel="Add capability" />
+                    </SectionCard>
+
+                    <SectionCard icon={ListChecks} title="Service delivery & reliability">
+                        <Field label="Title">
+                            <TextInput value={content.servicesPage.delivery.title} onChange={(e) => updateDeep(["servicesPage", "delivery", "title"], e.target.value)} />
+                        </Field>
+                        <div className="space-y-2">
+                            <span className="block text-xs font-semibold text-slate-600">Points</span>
+                            <StringListEditor items={content.servicesPage.delivery.items} onChange={(v) => updateDeep(["servicesPage", "delivery", "items"], v)} addLabel="Add point" />
+                        </div>
+                        <PhotoListEditor photos={content.servicesPage.deliveryPhotos} onChange={(v) => updateDeep(["servicesPage", "deliveryPhotos"], v)} onError={showError} hint="Up to 2 photos are shown beside the list." />
+                    </SectionCard>
+
+                    <SectionCard icon={Wrench} title="Plant & equipment">
+                        <Field label="Introduction">
+                            <TextArea rows={3} value={content.servicesPage.equipment.intro} onChange={(e) => updateDeep(["servicesPage", "equipment", "intro"], e.target.value)} />
+                        </Field>
+                        <EquipmentGroupsEditor groups={content.servicesPage.equipment.groups} onChange={(v) => updateDeep(["servicesPage", "equipment", "groups"], v)} />
+                        <PhotoListEditor photos={content.servicesPage.equipmentPhotos} onChange={(v) => updateDeep(["servicesPage", "equipmentPhotos"], v)} onError={showError} hint="Shown in a row under the equipment lists." />
+                    </SectionCard>
+
+                    <SectionCard icon={Handshake} title="Partner with GRP">
+                        <Field label="Introduction">
+                            <TextArea rows={2} value={content.servicesPage.partners.intro} onChange={(e) => updateDeep(["servicesPage", "partners", "intro"], e.target.value)} />
+                        </Field>
+                        <div className="grid md:grid-cols-2 gap-5">
+                            <div className="space-y-2">
+                                <span className="block text-xs font-semibold text-slate-600">Who we work with</span>
+                                <StringListEditor items={content.servicesPage.partners.clients} onChange={(v) => updateDeep(["servicesPage", "partners", "clients"], v)} />
+                            </div>
+                            <div className="space-y-2">
+                                <span className="block text-xs font-semibold text-slate-600">How we engage</span>
+                                <StringListEditor items={content.servicesPage.partners.engagements} onChange={(v) => updateDeep(["servicesPage", "partners", "engagements"], v)} />
+                            </div>
+                        </div>
+                    </SectionCard>
+
+                    <div className="pt-4">
+                        <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-grpsi-blue/50">Core service lines</p>
+                        <p className="text-sm text-slate-500 mt-1">The detailed service divisions shown further down the Services page and on the homepage.</p>
+                    </div>
                 </>
             )}
 
@@ -687,6 +669,23 @@ function AdminEditor() {
                         </Field>
                     </SectionCard>
 
+                    <SectionCard icon={Building2} title="Company details" description="Shown in the footer and on the contact page.">
+                        <div className="grid sm:grid-cols-2 gap-5">
+                            <Field label="Tagline">
+                                <TextInput value={content.footer.tagline} placeholder="Local Delivery. Global Standards." onChange={(e) => updateDeep(["footer", "tagline"], e.target.value)} />
+                            </Field>
+                            <Field label="Ownership">
+                                <TextInput value={content.footer.ownership} placeholder="100% Solomon Islands owned" onChange={(e) => updateDeep(["footer", "ownership"], e.target.value)} />
+                            </Field>
+                            <Field label="Business number">
+                                <TextInput value={content.footer.businessNumber} placeholder="SBN…" onChange={(e) => updateDeep(["footer", "businessNumber"], e.target.value)} />
+                            </Field>
+                            <Field label="Operating bases">
+                                <TextInput value={content.footer.operations} placeholder="Honiara & Gizo" onChange={(e) => updateDeep(["footer", "operations"], e.target.value)} />
+                            </Field>
+                        </div>
+                    </SectionCard>
+
                     {(content.footer.social || []).length > 0 && (
                         <SectionCard icon={Share2} title="Social links">
                             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -733,7 +732,7 @@ function AdminEditor() {
                     )}
                     <button
                         type="button"
-                        onClick={() => handleSave(tab.collection, content[tab.collection] ?? (tab.collection === "services" || tab.collection === "projects" ? [] : {}))}
+                        onClick={handleSave}
                         disabled={isSaving || !isDirty}
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-grpsi-blue text-white rounded-xl font-semibold text-sm hover:bg-grpsi-blue-light transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
