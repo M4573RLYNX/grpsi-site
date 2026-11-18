@@ -21,38 +21,28 @@ const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 
 // Content key (Neon row key / Vercel KV key)
 const MARITIME_DATA_KEY = 'gprsi_site_content';
-const EMPTY_DB = () => ({ about: {}, services: [], projects: [], home: {}, footer: {} });
+const STORAGE = sql ? 'neon' : (IS_CLOUD && kv) ? 'vercel-kv' : 'local-file';
 
+// Throws when content can't be loaded. Never returns blank data on failure,
+// so the admin panel can't load empty content and save it over the real thing.
 const readDB = async () => {
     if (sql) {
-        try {
-            const rows = await sql`SELECT data FROM site_content WHERE key = ${MARITIME_DATA_KEY}`;
-            return rows[0]?.data || EMPTY_DB();
-        } catch (err) {
-            console.error("Neon Retrieval Error:", err);
-            return EMPTY_DB();
-        }
+        const rows = await sql`SELECT data FROM site_content WHERE key = ${MARITIME_DATA_KEY}`;
+        if (!rows[0]?.data) throw new Error(`No '${MARITIME_DATA_KEY}' row in Neon table site_content. Run scripts/migrate-to-neon.mjs against this database.`);
+        return rows[0].data;
     }
 
     if (IS_CLOUD && kv) {
-        try {
-            const data = await kv.get(MARITIME_DATA_KEY);
-            return data || { about: {}, services: [], projects: [], home: {}, footer: {} };
-        } catch (err) {
-            console.error("Cloud Retrieval Error:", err);
-            // Fallback to minimal data if cloud fails
-            return { about: {}, services: [], projects: [], home: {}, footer: {} };
-        }
+        const data = await kv.get(MARITIME_DATA_KEY);
+        if (!data) throw new Error(`Vercel KV key '${MARITIME_DATA_KEY}' is empty.`);
+        return data;
     }
 
-    try {
-        const data = fs.readFileSync(DB_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (err) {
-        console.error("Error reading maritime database:", err);
-        return { about: {}, services: [], projects: [], home: {}, footer: {} };
-    }
+    return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
 };
+
+// Strip anything that looks like a connection string before exposing an error.
+const safeMessage = (err) => String(err?.message || err).replace(/\w+:\/\/[^\s'"]+/g, '<redacted-url>');
 
 const writeDB = async (data) => {
     if (sql) {
@@ -135,6 +125,25 @@ app.post('/api/auth/login', (req, res) => {
 
 // --- API ROUTES ---
 
+// Storage diagnostics (Public, no secrets)
+app.get('/api/health', async (req, res) => {
+    const info = {
+        storage: STORAGE,
+        env: {
+            DATABASE_URL: !!process.env.DATABASE_URL,
+            KV_URL: !!process.env.KV_URL,
+            JWT_SECRET: !!process.env.JWT_SECRET,
+            ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+        },
+    };
+    try {
+        const data = await readDB();
+        res.json({ ok: true, ...info, projects: data.projects?.length ?? 0, services: data.services?.length ?? 0 });
+    } catch (err) {
+        res.status(503).json({ ok: false, ...info, error: safeMessage(err) });
+    }
+});
+
 // Get All Content (Public)
 app.get('/api/content', async (req, res) => {
     const data = await readDB();
@@ -181,6 +190,12 @@ app.post('/api/admin/update', authenticateToken, async (req, res) => {
     } else {
         res.status(500).json({ error: "Failed to write to database." });
     }
+});
+
+// Express 5 forwards rejected async handlers here (e.g. readDB failures).
+app.use((err, req, res, next) => {
+    console.error(`[${STORAGE}] ${req.method} ${req.path} failed:`, err);
+    res.status(503).json({ error: `Content database unavailable (${STORAGE}): ${safeMessage(err)}` });
 });
 
 app.listen(PORT, () => {
