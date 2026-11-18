@@ -550,14 +550,42 @@ export default function AdminPage() {
                 )}
 
                 {/* PROJECTS EDITOR */}
-                {activeTab === "projects" && content.projects && (
+                {activeTab === "projects" && (
                     <div className="space-y-12">
-                        {content.projects.map((project: any, index: number) => (
+                        {(content.projects || []).map((project: any, index: number) => (
                             <div key={index} className="flex flex-col lg:flex-row gap-8 p-8 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="w-full lg:w-48 h-32 rounded-xl border border-white overflow-hidden shadow-sm shrink-0">
-                                    <img src={project.image} className="w-full h-full object-cover" alt="Fleet Project" />
+                                <div className="w-full lg:w-48 h-32 rounded-xl border border-white overflow-hidden shadow-sm shrink-0 bg-slate-100 flex items-center justify-center">
+                                    {project.image
+                                        ? <img src={project.image} className="w-full h-full object-cover" alt="Fleet Project" />
+                                        : <ImageIcon className="w-8 h-8 text-slate-300" />}
                                 </div>
                                 <div className="flex-1 space-y-4">
+                                    <div className="flex justify-between items-center gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-[10px] uppercase text-slate-400 font-bold">Category</label>
+                                            <select className="px-3 py-2 rounded-lg border border-slate-200 text-slate-900 text-xs bg-white"
+                                                value={project.category || 'Engineering'} onChange={(e) => {
+                                                    const next = [...content.projects];
+                                                    next[index] = { ...next[index], category: e.target.value };
+                                                    setContent({ ...content, projects: next });
+                                                }}>
+                                                <option>Engineering</option>
+                                                <option>Logistics</option>
+                                                <option>Fuel</option>
+                                            </select>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            title="Remove project"
+                                            onClick={() => {
+                                                const next = content.projects.filter((_: any, i: number) => i !== index);
+                                                setContent({ ...content, projects: next });
+                                            }}
+                                            className="text-red-400 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                         <div className="col-span-2 space-y-1">
                                             <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Project Name</label>
@@ -684,9 +712,31 @@ export default function AdminPage() {
                                 </div>
                             </div>
                         ))}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const next = [...(content.projects || []), {
+                                    title: "New Project",
+                                    slug: "",
+                                    location: "",
+                                    year: String(new Date().getFullYear()),
+                                    category: "Engineering",
+                                    image: "",
+                                    description: "",
+                                    challenge: "",
+                                    solution: "",
+                                    result: ""
+                                }];
+                                setContent({ ...content, projects: next });
+                            }}
+                            className="w-full flex items-center justify-center gap-3 py-6 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-xs hover:border-grpsi-blue hover:text-grpsi-blue transition-all"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Add Project
+                        </button>
                         <div className="flex justify-end pt-8 border-t border-slate-100">
-                            <button 
-                                onClick={() => handleSave("projects", content.projects)}
+                            <button
+                                onClick={() => handleSave("projects", content.projects || [])}
                                 disabled={isSaving}
                                 className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
                             >
