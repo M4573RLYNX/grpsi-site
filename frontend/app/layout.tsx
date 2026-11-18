@@ -17,11 +17,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "GRP & Associates Ltd | Maritime, Engineering & Fuel — Solomon Islands",
+    default: "GRP & Associates Ltd | Earthworks, Civil Engineering, Construction & Logistics — Solomon Islands",
     template: "%s | GRP & Associates",
   },
   description:
-    "Maritime logistics, civil engineering and fuel distribution across the Solomon Islands, from our base in Honiara.",
+    "100% Solomon Islands owned since 1987. Earthworks, civil engineering, construction, marine works and logistics for mining, infrastructure and development projects, from Honiara and Gizo.",
   openGraph: BASE_OPEN_GRAPH,
 };
 

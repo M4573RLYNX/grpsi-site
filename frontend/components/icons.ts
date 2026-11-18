@@ -1,10 +1,12 @@
 import {
-    Anchor, Drill, Factory, Fuel, Globe, HardHat, Ship, Truck, Users, Waves, Wrench, type LucideIcon,
+    Anchor, BadgeCheck, ClipboardList, Drill, Factory, Fuel, Globe, GraduationCap, HardHat, Leaf, Pickaxe,
+    Scale, ShieldCheck, Ship, Truck, Users, Warehouse, Waves, Wrench, type LucideIcon,
 } from "lucide-react";
 
-/** Icon names that can be entered in the admin (service.icon, footer.social[].platform). */
+/** Icon names usable in content (service.icon, footer.social[].platform, lib/company.ts). */
 const REGISTRY: Record<string, LucideIcon> = {
-    Anchor, Drill, Factory, Fuel, Globe, HardHat, Ship, Truck, Users, Waves, Wrench,
+    Anchor, BadgeCheck, ClipboardList, Drill, Factory, Fuel, Globe, GraduationCap, HardHat, Leaf, Pickaxe,
+    Scale, ShieldCheck, Ship, Truck, Users, Warehouse, Waves, Wrench,
 };
 
 export function resolveIcon(name: string | undefined, fallback: LucideIcon = Ship): LucideIcon {

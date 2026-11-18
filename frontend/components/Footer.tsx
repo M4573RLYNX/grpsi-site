@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Globe, Mail, MapPin, Phone } from "lucide-react";
 import type { FooterContent } from "@/lib/types";
+import { COMPANY } from "@/lib/company";
 import { resolveIcon } from "./icons";
 import { Container, Eyebrow, cn, focusRing, telHref } from "./ui";
 
@@ -90,8 +91,10 @@ export default function Footer({ footer }: { footer: FooterContent }) {
                     </div>
 
                     <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-2 justify-between text-sm text-white/50">
-                        <p>© {year} GRP & Associates Ltd. All rights reserved.</p>
-                        <p>Honiara, Solomon Islands</p>
+                        <p>
+                            © {year} {COMPANY.name}. {COMPANY.ownership}. Business number {COMPANY.businessNumber}.
+                        </p>
+                        <p>{COMPANY.tagline}</p>
                     </div>
                 </Container>
             </div>

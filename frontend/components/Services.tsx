@@ -41,7 +41,7 @@ export function ServiceDetail({ service, index }: { service: Service; index: num
                         <IconBadge icon={Icon} tone="solid" />
                         <span className="text-sm font-semibold text-slate-500">0{index + 1}</span>
                     </div>
-                    <h2 className="mt-5 text-2xl sm:text-3xl font-black tracking-tight text-grpsi-blue">{service.title}</h2>
+                    <h3 className="mt-5 text-2xl sm:text-3xl font-black tracking-tight text-grpsi-blue">{service.title}</h3>
                     <p className="mt-3 text-slate-600 leading-relaxed">{service.description}</p>
                     {service.features.length > 0 && (
                         <ul className="mt-6 grid sm:grid-cols-2 gap-2">

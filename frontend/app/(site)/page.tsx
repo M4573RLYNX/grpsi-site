@@ -6,6 +6,7 @@ import CtaBand from "@/components/CtaBand";
 import ProjectCard from "@/components/ProjectCard";
 import Reveal from "@/components/Reveal";
 import SafeImage from "@/components/SafeImage";
+import { PHOTOS } from "@/lib/company";
 import { ServiceCard } from "@/components/Services";
 import { Button, Container, IconBadge, SectionHeading, cn, surface } from "@/components/ui";
 
@@ -28,7 +29,7 @@ export default async function HomePage() {
                         <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 items-center">
                             <Reveal>
                                 <div className={cn(surface.media, "aspect-[4/3] shadow-float")}>
-                                    <SafeImage src="/gprsi_team_operations_image_1774928148738.png" alt="GPRSI operations team at work" sizes="(min-width: 1024px) 560px, 100vw" />
+                                    <SafeImage src={PHOTOS.bulkEarthworks.src} alt={PHOTOS.bulkEarthworks.alt} sizes="(min-width: 1024px) 560px, 100vw" />
                                 </div>
                             </Reveal>
                             <Reveal delay={0.1}>

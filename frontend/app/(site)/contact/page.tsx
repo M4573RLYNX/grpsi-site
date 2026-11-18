@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { getContent } from "@/lib/content";
+import { COMPANY } from "@/lib/company";
 import ContactForm from "@/components/ContactForm";
 import { Container, IconBadge, PageHeader, cn, focusRing, surface, telHref } from "@/components/ui";
 
@@ -59,6 +60,16 @@ export default async function ContactPage() {
                         ) : (
                             <p className="mt-4 text-white/70">Contact details are being updated.</p>
                         )}
+                        <dl className="mt-8 pt-6 border-t border-white/10 grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <dt className="text-white/60">Operations</dt>
+                                <dd className="font-semibold">Honiara &amp; Gizo</dd>
+                            </div>
+                            <div>
+                                <dt className="text-white/60">Business number</dt>
+                                <dd className="font-semibold">{COMPANY.businessNumber}</dd>
+                            </div>
+                        </dl>
                     </div>
 
                     <div className={cn(surface.card, "lg:col-span-3 p-6 sm:p-8")}>

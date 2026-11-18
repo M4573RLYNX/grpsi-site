@@ -21,7 +21,7 @@ const FALLBACK_CONTENT: SiteContent = {
             title: "GRP & Associates Ltd",
             highlight: "Associates",
             subtitle: "Maritime logistics, engineering and fuel distribution across the Solomon Islands.",
-            backgroundImage: "/hero_maritime_solomon_islands_1774927638390.png",
+            backgroundImage: "/images/cover.jpeg",
             establishedText: "",
             buttons: {
                 primary: { label: "Our services", link: "/services" },
