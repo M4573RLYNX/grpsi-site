@@ -16,7 +16,11 @@ const NAV_LINKS = [
 
 const isActive = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
-/** Floating pill navbar. Transparent over the home hero until scrolled; white glass elsewhere. */
+/**
+ * Fixed header made of separate floating "islands": logo, page links and call to action
+ * (logo + menu toggle on mobile). Clear glass over the home hero; frosted white once
+ * scrolled and on inner pages. Stays pinned while scrolling.
+ */
 export default function Navbar() {
     const pathname = usePathname();
     const [scrolled, setScrolled] = useState(false);
@@ -53,18 +57,29 @@ export default function Navbar() {
 
     const overHero = pathname === "/" && !scrolled && !open;
 
+    // Shared glass "island" surface: clear over the home hero, frosted white once scrolled / on inner pages.
+    const island = cn(
+        "pointer-events-auto rounded-full backdrop-blur-xl transition-all duration-300",
+        overHero
+            ? "bg-white/10 ring-1 ring-white/25 text-white shadow-lg shadow-black/10"
+            : "bg-white/80 ring-1 ring-slate-200/70 text-grpsi-blue shadow-premium",
+    );
+
     return (
-        <header className="fixed top-3 sm:top-4 inset-x-3 sm:inset-x-4 z-50">
-            <nav
-                aria-label="Primary"
-                className={cn(
-                    "relative mx-auto max-w-6xl flex items-center gap-2 rounded-full pl-4 pr-2 py-2 transition-all duration-300 backdrop-blur-xl",
-                    overHero
-                        ? "bg-white/10 ring-1 ring-white/20 text-white"
-                        : "bg-white/85 ring-1 ring-slate-200/70 shadow-premium text-grpsi-blue",
-                )}
-            >
-                <Link href="/" className={cn(focusRing, "flex items-center shrink-0 rounded-full focus-visible:ring-grpsi-gold")} aria-label="GRP & Associates — home">
+        // The header itself ignores clicks so the gaps between islands don't block the page.
+        <header
+            className={cn(
+                "pointer-events-none fixed inset-x-3 sm:inset-x-4 z-50 transition-[top] duration-300",
+                scrolled ? "top-2 sm:top-3" : "top-3 sm:top-5",
+            )}
+        >
+            <nav aria-label="Primary" className="relative mx-auto max-w-6xl grid grid-cols-[1fr_auto] md:grid-cols-[1fr_auto_1fr] items-center gap-3">
+                {/* Island 1: logo */}
+                <Link
+                    href="/"
+                    aria-label="GRP & Associates — home"
+                    className={cn(island, focusRing, "justify-self-start flex items-center h-12 px-5 focus-visible:ring-grpsi-gold")}
+                >
                     <Image
                         src="/logo.png"
                         alt="GPRSI"
@@ -75,7 +90,8 @@ export default function Navbar() {
                     />
                 </Link>
 
-                <ul className="hidden md:flex items-center gap-1 mx-auto">
+                {/* Island 2: page links */}
+                <ul className={cn(island, "hidden md:flex items-center gap-1 h-12 p-1.5")}>
                     {NAV_LINKS.map((link) => {
                         const active = isActive(pathname, link.href);
                         return (
@@ -84,7 +100,7 @@ export default function Navbar() {
                                     href={link.href}
                                     aria-current={active ? "page" : undefined}
                                     className={cn(
-                                        focusRing, "block rounded-full px-4 py-2 text-sm font-semibold transition-all",
+                                        focusRing, "flex items-center h-9 rounded-full px-4 text-sm font-semibold transition-all",
                                         overHero ? "focus-visible:ring-white" : "focus-visible:ring-grpsi-blue",
                                         active
                                             ? overHero ? "bg-white text-grpsi-blue" : "bg-grpsi-blue text-white"
@@ -98,17 +114,24 @@ export default function Navbar() {
                     })}
                 </ul>
 
-                <Link
-                    href="/contact"
-                    className={cn(
-                        focusRing, "hidden md:inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all focus-visible:ring-offset-2",
-                        overHero ? "bg-grpsi-gold text-grpsi-blue hover:bg-grpsi-gold-muted focus-visible:ring-white" : "bg-grpsi-blue text-white hover:bg-grpsi-blue-light focus-visible:ring-grpsi-blue",
-                    )}
-                >
-                    Get a quote
-                    <ArrowRight className="w-4 h-4" aria-hidden />
-                </Link>
+                {/* Island 3: call to action (desktop) */}
+                <div className={cn(island, "hidden md:flex justify-self-end h-12 p-1.5")}>
+                    <Link
+                        href="/contact"
+                        className={cn(
+                            focusRing,
+                            "inline-flex items-center gap-2 h-9 rounded-full px-5 text-sm font-semibold transition-all focus-visible:ring-offset-2",
+                            overHero
+                                ? "bg-grpsi-gold text-grpsi-blue hover:bg-grpsi-gold-muted focus-visible:ring-white"
+                                : "bg-grpsi-blue text-white hover:bg-grpsi-blue-light focus-visible:ring-grpsi-blue",
+                        )}
+                    >
+                        Get a quote
+                        <ArrowRight className="w-4 h-4" aria-hidden />
+                    </Link>
+                </div>
 
+                {/* Mobile: menu toggle island */}
                 <button
                     ref={toggleRef}
                     type="button"
@@ -117,18 +140,20 @@ export default function Navbar() {
                     aria-controls="mobile-menu"
                     aria-label={open ? "Close menu" : "Open menu"}
                     className={cn(
-                        focusRing, "md:hidden ml-auto h-10 w-10 rounded-full flex items-center justify-center transition-all",
-                        overHero ? "bg-white/15 hover:bg-white/25 focus-visible:ring-white" : "bg-slate-100 hover:bg-slate-200 focus-visible:ring-grpsi-blue",
+                        island,
+                        focusRing,
+                        "md:hidden justify-self-end h-12 w-12 flex items-center justify-center",
+                        overHero ? "hover:bg-white/20 focus-visible:ring-white" : "hover:bg-white focus-visible:ring-grpsi-blue",
                     )}
                 >
                     {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </button>
 
-                {/* Mobile menu */}
+                {/* Mobile menu panel */}
                 <div
                     id="mobile-menu"
                     hidden={!open}
-                    className="md:hidden absolute top-full inset-x-0 mt-2 rounded-[28px] bg-white ring-1 ring-slate-200/70 shadow-float p-3"
+                    className="pointer-events-auto md:hidden absolute top-full inset-x-0 mt-2 rounded-[28px] bg-white ring-1 ring-slate-200/70 shadow-float p-3"
                 >
                     <ul className="space-y-1">
                         {NAV_LINKS.map((link) => {
