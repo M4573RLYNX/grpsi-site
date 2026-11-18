@@ -470,16 +470,24 @@ export default function AdminPage() {
                 )}
 
                 {/* SERVICES EDITOR */}
-                {activeTab === "services" && content.services && (
+                {activeTab === "services" && (
                     <div className="space-y-12">
-                        {content.services.map((service: any, index: number) => (
+                        {(content.services || []).map((service: any, index: number) => (
                             <div key={index} className="p-8 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-6">
                                 <div className="flex justify-between items-center">
                                     <h4 className="font-bold text-grpsi-blue flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border border-slate-100 italic text-slate-400">{index + 1}</div>
                                         {service.title}
                                     </h4>
-                                    <button className="text-red-400 hover:text-red-500 transition-colors">
+                                    <button
+                                        type="button"
+                                        title="Remove service"
+                                        onClick={() => {
+                                            const next = content.services.filter((_: any, i: number) => i !== index);
+                                            setContent({ ...content, services: next });
+                                        }}
+                                        className="text-red-400 hover:text-red-500 transition-colors"
+                                    >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -523,22 +531,67 @@ export default function AdminPage() {
                                 </div>
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Capabilities Listing</label>
-                                    {service.features.map((feature: string, fIndex: number) => (
-                                        <input key={fIndex} className="w-full px-4 py-2 bg-white rounded-lg border border-slate-100 text-slate-900 text-xs"
-                                            value={feature} onChange={(e) => {
-                                                const next = [...content.services];
-                                                const nextFeatures = [...next[index].features];
-                                                nextFeatures[fIndex] = e.target.value;
-                                                next[index] = { ...next[index], features: nextFeatures };
-                                                setContent({ ...content, services: next });
-                                            }} />
+                                    {(service.features || []).map((feature: string, fIndex: number) => (
+                                        <div key={fIndex} className="flex items-center gap-2">
+                                            <input className="w-full px-4 py-2 bg-white rounded-lg border border-slate-100 text-slate-900 text-xs"
+                                                value={feature} onChange={(e) => {
+                                                    const next = [...content.services];
+                                                    const nextFeatures = [...(next[index].features || [])];
+                                                    nextFeatures[fIndex] = e.target.value;
+                                                    next[index] = { ...next[index], features: nextFeatures };
+                                                    setContent({ ...content, services: next });
+                                                }} />
+                                            <button
+                                                type="button"
+                                                title="Remove capability"
+                                                onClick={() => {
+                                                    const next = [...content.services];
+                                                    const nextFeatures = (next[index].features || []).filter((_: string, i: number) => i !== fIndex);
+                                                    next[index] = { ...next[index], features: nextFeatures };
+                                                    setContent({ ...content, services: next });
+                                                }}
+                                                className="text-red-300 hover:text-red-500 transition-colors shrink-0"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
                                     ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const next = [...content.services];
+                                            next[index] = { ...next[index], features: [...(next[index].features || []), ""] };
+                                            setContent({ ...content, services: next });
+                                        }}
+                                        className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-grpsi-blue transition-colors"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add Capability
+                                    </button>
                                 </div>
                             </div>
                         ))}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const next = [...(content.services || []), {
+                                    id: `service-${Date.now()}`,
+                                    title: "New Service",
+                                    description: "",
+                                    icon: "Ship",
+                                    features: [],
+                                    image: ""
+                                }];
+                                setContent({ ...content, services: next });
+                            }}
+                            className="w-full flex items-center justify-center gap-3 py-6 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-xs hover:border-grpsi-blue hover:text-grpsi-blue transition-all"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Add Service
+                        </button>
                         <div className="flex justify-end pt-8 border-t border-slate-100">
-                            <button 
-                                onClick={() => handleSave("services", content.services)}
+                            <button
+                                onClick={() => handleSave("services", content.services || [])}
                                 disabled={isSaving}
                                 className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
                             >
