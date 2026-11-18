@@ -1,40 +1,227 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import SectionHeading from '@/components/SectionHeading';
-import { Save, RefreshCw, Plus, Trash2, Edit3, Loader2, CheckCircle, AlertCircle, Globe, LayoutDashboard, Briefcase, FileText, Settings, Upload, Image as ImageIcon, Ship, Users, Link2, BookOpen, Target, Lightbulb, Trophy, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
+import Link from "next/link";
+import {
+    Save, RefreshCw, Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Globe, Briefcase, FileText,
+    Settings, Upload, Image as ImageIcon, Ship, Users, Link2, BookOpen, Target, Lightbulb, Trophy,
+    ChevronDown, House, Sparkles, MousePointerClick, Megaphone, BarChart3, Mail, MapPin, Phone,
+    ExternalLink, X, Layers, Share2,
+} from "lucide-react";
+
+/* ------------------------------------------------------------------ */
+/* Config                                                              */
+/* ------------------------------------------------------------------ */
+
+const TABS: Record<string, { title: string; description: string; icon: any; collection: string; viewHref: string }> = {
+    home: { title: "Landing Page", description: "Hero banner, call-to-action buttons and contact strip shown on the homepage.", icon: House, collection: "home", viewHref: "/" },
+    about: { title: "About Page", description: "Company story, headline and the key metrics shown across the site.", icon: FileText, collection: "about", viewHref: "/about" },
+    services: { title: "Services", description: "The service lines you offer, with imagery and capability lists.", icon: Ship, collection: "services", viewHref: "/services" },
+    projects: { title: "Projects", description: "Portfolio entries and their case-study pages.", icon: Briefcase, collection: "projects", viewHref: "/projects" },
+    footer: { title: "Global Settings", description: "Contact details, footer copy and social links used on every page.", icon: Settings, collection: "footer", viewHref: "/" },
+};
+
+const apiUrl = (path: string) => {
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
+    return apiBase.endsWith("/api") ? `${apiBase}${path}` : `${apiBase}/api${path}`;
+};
+
+/* ------------------------------------------------------------------ */
+/* UI primitives                                                       */
+/* ------------------------------------------------------------------ */
+
+const inputCls =
+    "w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-300 outline-none transition-all hover:border-slate-300 focus:border-grpsi-blue focus:ring-4 focus:ring-grpsi-blue/10";
+
+function Field({ label, hint, icon: Icon, className = "", children }: { label: string; hint?: string; icon?: any; className?: string; children: React.ReactNode }) {
+    return (
+        <label className={`block space-y-2 ${className}`}>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
+                {label}
+            </span>
+            {children}
+            {hint && <span className="block text-[11px] text-slate-400">{hint}</span>}
+        </label>
+    );
+}
+
+function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+    return <input type="text" {...props} value={props.value ?? ""} className={`${inputCls} ${props.className ?? ""}`} />;
+}
+
+function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+    return <textarea rows={3} {...props} value={props.value ?? ""} className={`${inputCls} resize-y leading-relaxed ${props.className ?? ""}`} />;
+}
+
+function SectionCard({ icon: Icon, title, description, action, children }: { icon: any; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
+    return (
+        <section className="bg-white/80 backdrop-blur rounded-[28px] ring-1 ring-slate-200/70 shadow-premium p-6 sm:p-8">
+            <header className="flex items-start gap-4 mb-6">
+                <div className="h-10 w-10 shrink-0 rounded-2xl bg-grpsi-blue/5 text-grpsi-blue flex items-center justify-center">
+                    <Icon className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-slate-900">{title}</h3>
+                    {description && <p className="text-sm text-slate-500 mt-0.5">{description}</p>}
+                </div>
+                {action}
+            </header>
+            <div className="space-y-5">{children}</div>
+        </section>
+    );
+}
+
+function IconButton({ onClick, label, danger, children }: { onClick: () => void; label: string; danger?: boolean; children: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={label}
+            aria-label={label}
+            className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center transition-all ${
+                danger ? "text-slate-400 hover:text-red-500 hover:bg-red-50" : "text-slate-400 hover:text-grpsi-blue hover:bg-slate-100"
+            }`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function AddButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="w-full flex items-center justify-center gap-2 py-5 rounded-[24px] border-2 border-dashed border-slate-200 text-slate-500 font-semibold text-sm hover:border-grpsi-blue hover:text-grpsi-blue hover:bg-white/60 transition-all"
+        >
+            <Plus className="w-4 h-4" />
+            {children}
+        </button>
+    );
+}
+
+function ImageUploader({ label, currentUrl, onUpload, onError }: { label: string; currentUrl: string; onUpload: (url: string) => void; onError: (msg: string) => void }) {
+    const [uploading, setUploading] = useState(false);
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+
+        setUploading(true);
+        try {
+            const response = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+            if (response.ok) {
+                const blob = await response.json();
+                onUpload(blob.url);
+            } else {
+                const err = await response.json().catch(() => ({}));
+                onError(`Upload failed: ${err.error || "Server error"}`);
+            }
+        } catch {
+            onError("Connection error during upload.");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
+                {label}
+            </span>
+            <div className="flex flex-col sm:flex-row gap-4 p-3 rounded-2xl bg-slate-50 ring-1 ring-slate-200/70">
+                <div className="relative w-full sm:w-40 aspect-video sm:aspect-auto sm:h-24 rounded-xl overflow-hidden bg-white ring-1 ring-slate-200 flex items-center justify-center shrink-0">
+                    {currentUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={currentUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                        <ImageIcon className="w-6 h-6 text-slate-300" />
+                    )}
+                    {uploading && (
+                        <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 animate-spin text-grpsi-blue" />
+                        </div>
+                    )}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+                    <label
+                        className={`inline-flex w-fit items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                            uploading ? "bg-slate-100 text-slate-400 pointer-events-none" : "bg-white ring-1 ring-slate-200 text-slate-700 hover:ring-grpsi-blue hover:text-grpsi-blue"
+                        }`}
+                    >
+                        <Upload className="w-4 h-4" />
+                        {uploading ? "Uploading…" : currentUrl ? "Replace image" : "Upload image"}
+                        <input type="file" accept="image/*" onChange={handleFileChange} className="sr-only" disabled={uploading} />
+                    </label>
+                    {currentUrl && <p className="text-[11px] font-mono text-slate-400 truncate" title={currentUrl}>{currentUrl}</p>}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
 
 export default function AdminPage() {
-    const searchParams = useSearchParams();
-    const [content, setContent] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "about");
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
-    const [error, setError] = useState("");
+    return (
+        <Suspense fallback={<LoadingState />}>
+            <AdminEditor />
+        </Suspense>
+    );
+}
 
-    useEffect(() => {
-        const tab = searchParams.get("tab");
-        if (tab) setActiveTab(tab);
-    }, [searchParams]);
+function LoadingState() {
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-white shadow-premium ring-1 ring-slate-200/70 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-grpsi-blue" />
+            </div>
+            <p className="text-sm font-medium text-slate-400">Loading content…</p>
+        </div>
+    );
+}
+
+function AdminEditor() {
+    const searchParams = useSearchParams();
+    const activeTab = TABS[searchParams.get("tab") || ""] ? (searchParams.get("tab") as string) : "about";
+    const tab = TABS[activeTab];
+
+    const [content, setContent] = useState<any>(null);
+    const [saved, setSaved] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         fetchContent();
     }, []);
 
+    useEffect(() => {
+        if (!toast || toast.type === "error") return;
+        const t = setTimeout(() => setToast(null), 3000);
+        return () => clearTimeout(t);
+    }, [toast]);
+
+    const showError = (message: string) => setToast({ type: "error", message });
+
     const fetchContent = async () => {
         setLoading(true);
-        setError("");
+        setToast(null);
         try {
-            const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
-            const url = apiBase.endsWith('/api') ? `${apiBase}/content` : `${apiBase}/api/content`;
-            
-            const res = await fetch(url);
+            const res = await fetch(apiUrl("/content"));
+            if (!res.ok) throw new Error();
             const data = await res.json();
             setContent(data);
-        } catch (err) {
-            setError("Failed to fetch content from fleet server.");
+            setSaved(data);
+        } catch {
+            setContent(null);
         } finally {
             setLoading(false);
         }
@@ -42,48 +229,42 @@ export default function AdminPage() {
 
     const handleSave = async (collection: string, updatedData: any) => {
         setIsSaving(true);
-        setSaveSuccess(false);
-        setError("");
+        setToast(null);
         const token = localStorage.getItem("gprsi_admin_token");
-        
-        try {
-            const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
-            const url = apiBase.endsWith('/api') ? `${apiBase}/admin/update` : `${apiBase}/api/admin/update`;
 
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ collection, fullCollection: updatedData })
+        try {
+            const res = await fetch(apiUrl("/admin/update"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ collection, fullCollection: updatedData }),
             });
 
             if (res.ok) {
-                setSaveSuccess(true);
-                setTimeout(() => setSaveSuccess(false), 3000);
+                setSaved((prev: any) => ({ ...prev, [collection]: updatedData }));
+                setToast({ type: "success", message: "Changes published to the live site." });
             } else if (res.status === 403 || res.status === 401) {
-                setError("Security session expired. Please Log Out and Log In again to refresh your access.");
-                // Optionally: localStorage.removeItem("gprsi_admin_token");
+                showError("Your session has expired. Log out and log in again to continue.");
             } else {
-                const errData = await res.json();
-                setError(errData.error || "Update failed.");
+                const errData = await res.json().catch(() => ({}));
+                showError(errData.error || "Update failed.");
             }
         } catch (err: any) {
-            console.error("Critical Maritime Link Failure:", err);
-            const detail = err.name === 'TypeError' ? " (Possible CORS/Network issue)" : "";
-            setError(`Connectivity lost. Check your maritime link${detail}.`);
+            console.error("Save failed:", err);
+            const detail = err?.name === "TypeError" ? " (possible CORS/network issue)" : "";
+            showError(`Could not reach the server${detail}.`);
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("gprsi_admin_token");
-        window.location.href = "/admin"; // Simple reset
-    };
+    const isDirty = useMemo(() => {
+        if (!content || !saved) return false;
+        return JSON.stringify(content[tab.collection]) !== JSON.stringify(saved[tab.collection]);
+    }, [content, saved, tab.collection]);
 
-    // Helper for robust deep updates
+    const discardChanges = () => setContent((prev: any) => ({ ...prev, [tab.collection]: saved[tab.collection] }));
+
+    // Deep update helper: updateDeep(['home','hero','title'], value)
     const updateDeep = (path: string[], value: any) => {
         setContent((prev: any) => {
             const newContent = { ...prev };
@@ -97,786 +278,476 @@ export default function AdminPage() {
         });
     };
 
-    // --- Image Uploader Sub-Component ---
-    const ImageUploader = ({ label, currentUrl, onUpload }: { label: string, currentUrl: string, onUpload: (url: string) => void }) => {
-        const [uploading, setUploading] = useState(false);
-
-        const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-
-            setUploading(true);
-            try {
-                const response = await fetch(`/api/upload?filename=${file.name}`, {
-                    method: 'POST',
-                    body: file,
-                });
-
-                if (response.ok) {
-                    const blob = await response.json();
-                    onUpload(blob.url);
-                } else {
-                    const err = await response.json();
-                    setError(`Upload failed: ${err.error || 'Server error'}`);
-                }
-            } catch (err) {
-                setError("Connectivity error during upload.");
-            } finally {
-                setUploading(false);
-            }
-        };
-
-        return (
-            <div className="space-y-3 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm transition-all hover:border-blue-200">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label}</label>
-                <div className="flex items-center gap-6">
-                    <div className="w-24 h-16 bg-slate-50 rounded-xl border border-dashed border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                        {currentUrl ? (
-                            <img src={currentUrl} alt="Preview" className="w-full h-full object-cover" />
-                        ) : (
-                            <Upload className="w-5 h-5 text-slate-300" />
-                        )}
-                    </div>
-                    <div className="flex-1 space-y-2">
-                        <div className="relative group">
-                            <input 
-                                type="file" 
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                                disabled={uploading}
-                            />
-                            <button className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-bold transition-all ${uploading ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-600 group-hover:border-blue-400 group-hover:text-blue-600'}`}>
-                                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                                {uploading ? 'Uploading...' : 'Select Maritime Asset'}
-                            </button>
-                        </div>
-                        <input 
-                            type="text" 
-                            className="w-full px-3 py-1.5 text-[10px] font-mono text-blue-500 bg-slate-50 rounded-md border-none outline-none overflow-hidden text-ellipsis"
-                            value={currentUrl}
-                            readOnly
-                        />
-                    </div>
-                </div>
-            </div>
-        );
+    // List helpers for services/projects
+    const updateItem = (key: "services" | "projects", index: number, patch: any) =>
+        setContent((prev: any) => {
+            const next = [...(prev[key] || [])];
+            next[index] = { ...next[index], ...patch };
+            return { ...prev, [key]: next };
+        });
+    const removeItem = (key: "services" | "projects", index: number) => {
+        const name = content[key]?.[index]?.title || "this item";
+        if (!window.confirm(`Remove "${name}"? This takes effect when you save.`)) return;
+        setContent((prev: any) => ({ ...prev, [key]: prev[key].filter((_: any, i: number) => i !== index) }));
     };
+    const addItem = (key: "services" | "projects", item: any) => {
+        const index = (content[key] || []).length;
+        setContent((prev: any) => ({ ...prev, [key]: [...(prev[key] || []), item] }));
+        setExpanded((e) => ({ ...e, [`${key}-${index}`]: true }));
+    };
+    const toggle = (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
-    if (loading) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
-                <Loader2 className="w-12 h-12 animate-spin text-slate-200 mb-4" />
-                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Accessing Control Panel...</p>
-            </div>
-        );
-    }
+    if (loading) return <LoadingState />;
 
     if (!content) {
         return (
-            <div className="bg-red-50 p-12 rounded-3xl text-center">
-                <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-red-600 mb-2">Sync Error</h2>
-                <p className="text-red-400 mb-6 font-medium">Unable to establish a link with the GPRSI database.</p>
-                <button 
-                    onClick={fetchContent}
-                    className="bg-red-600 text-white px-8 py-3 rounded-full font-bold uppercase tracking-widest text-sm"
-                >
-                    Retry Connection
-                </button>
+            <div className="min-h-[60vh] flex items-center justify-center">
+                <div className="max-w-md w-full bg-white rounded-[28px] ring-1 ring-slate-200/70 shadow-premium p-10 text-center">
+                    <div className="h-14 w-14 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-5">
+                        <AlertCircle className="w-7 h-7" />
+                    </div>
+                    <h2 className="text-lg font-bold text-slate-900 mb-1">Couldn&apos;t load content</h2>
+                    <p className="text-sm text-slate-500 mb-6">The content server didn&apos;t respond. Check the backend and try again.</p>
+                    <button
+                        onClick={fetchContent}
+                        className="inline-flex items-center gap-2 bg-grpsi-blue text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-grpsi-blue-light transition-all"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Retry
+                    </button>
+                </div>
             </div>
         );
     }
 
+    const services = content.services || [];
+    const projects = content.projects || [];
+
     return (
-        <div className="space-y-8 pb-20">
-            <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8">
-                <div>
-                    <SectionHeading title={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Management`} subtitle="Control Center" />
-                    <p className="text-slate-500 max-w-xl">
-                        Universal management for the GPRSI {activeTab} collection. 
-                        Ensure all technical specs are verified before publishing.
-                    </p>
+        <div className="space-y-6 pb-32">
+            {/* Page header */}
+            <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-2">
+                <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 shrink-0 rounded-[20px] bg-grpsi-blue text-white flex items-center justify-center shadow-lg shadow-grpsi-blue/20">
+                        <tab.icon className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-grpsi-blue/50">Content editor</p>
+                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{tab.title}</h1>
+                    </div>
                 </div>
-                <div className="flex gap-4">
-                    <button 
-                        onClick={fetchContent}
-                        className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-xl text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all font-sans"
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            if (isDirty && !window.confirm("Reloading will discard unsaved changes. Continue?")) return;
+                            fetchContent();
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-slate-600 font-semibold text-sm hover:ring-slate-300 hover:text-slate-900 transition-all"
                     >
                         <RefreshCw className="w-4 h-4" />
-                        Sync
+                        Reload
                     </button>
-                    <button 
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-6 py-3 bg-red-50 border border-red-100 rounded-xl text-red-600 font-bold text-sm hover:bg-red-100 transition-all font-sans"
+                    <Link
+                        href={tab.viewHref}
+                        target="_blank"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-slate-600 font-semibold text-sm hover:ring-slate-300 hover:text-slate-900 transition-all"
                     >
-                        <LogOut className="w-4 h-4" />
-                        Logout
-                    </button>
-                    {saveSuccess && (
-                        <div className="flex items-center gap-2 px-6 py-3 bg-green-50 text-green-600 rounded-xl font-bold text-sm font-sans">
-                            <CheckCircle className="w-4 h-4" />
-                            Published
-                        </div>
-                    )}
+                        <ExternalLink className="w-4 h-4" />
+                        View live
+                    </Link>
                 </div>
-            </div>
+            </header>
+            <p className="text-sm text-slate-500 -mt-2 max-w-2xl">{tab.description}</p>
 
-            {error && (
-                <div className="bg-red-50 border border-red-100 p-6 rounded-2xl flex items-center gap-4 text-red-600 font-bold font-sans">
-                    <AlertCircle className="w-6 h-6" />
-                    {error}
+            {/* HOME */}
+            {activeTab === "home" && content.home && (
+                <>
+                    <SectionCard icon={Sparkles} title="Hero section" description="The first thing visitors see on the homepage.">
+                        <div className="grid sm:grid-cols-2 gap-5">
+                            <Field label="Main title">
+                                <TextInput value={content.home.hero?.title} onChange={(e) => updateDeep(["home", "hero", "title"], e.target.value)} />
+                            </Field>
+                            <Field label="Highlight word" hint="Rendered in the accent colour.">
+                                <TextInput value={content.home.hero?.highlight} onChange={(e) => updateDeep(["home", "hero", "highlight"], e.target.value)} />
+                            </Field>
+                        </div>
+                        <Field label="Subtitle">
+                            <TextArea value={content.home.hero?.subtitle} onChange={(e) => updateDeep(["home", "hero", "subtitle"], e.target.value)} />
+                        </Field>
+                        <ImageUploader
+                            label="Background image"
+                            currentUrl={content.home.hero?.backgroundImage}
+                            onUpload={(url) => updateDeep(["home", "hero", "backgroundImage"], url)}
+                            onError={showError}
+                        />
+                    </SectionCard>
+
+                    <SectionCard icon={MousePointerClick} title="Hero buttons">
+                        <div className="grid sm:grid-cols-2 gap-4">
+                            {(["primary", "secondary"] as const).map((kind) => (
+                                <div key={kind} className="p-4 rounded-2xl bg-slate-50 ring-1 ring-slate-200/70 space-y-3">
+                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${kind === "primary" ? "bg-grpsi-blue text-white" : "bg-white ring-1 ring-slate-200 text-slate-500"}`}>
+                                        {kind}
+                                    </span>
+                                    <Field label="Label">
+                                        <TextInput value={content.home.hero?.buttons?.[kind]?.label} onChange={(e) => updateDeep(["home", "hero", "buttons", kind, "label"], e.target.value)} />
+                                    </Field>
+                                    <Field label="Link">
+                                        <TextInput placeholder="/contact" className="font-mono" value={content.home.hero?.buttons?.[kind]?.link} onChange={(e) => updateDeep(["home", "hero", "buttons", kind, "link"], e.target.value)} />
+                                    </Field>
+                                </div>
+                            ))}
+                        </div>
+                    </SectionCard>
+
+                    <SectionCard icon={Megaphone} title="Call to action" description="The banner near the bottom of the homepage.">
+                        <div className="grid sm:grid-cols-2 gap-5">
+                            <Field label="CTA title">
+                                <TextInput value={content.home.cta?.title} onChange={(e) => updateDeep(["home", "cta", "title"], e.target.value)} />
+                            </Field>
+                            <Field label="Contact phone" icon={Phone}>
+                                <TextInput value={content.home.cta?.phone} onChange={(e) => updateDeep(["home", "cta", "phone"], e.target.value)} />
+                            </Field>
+                        </div>
+                    </SectionCard>
+                </>
+            )}
+
+            {/* ABOUT */}
+            {activeTab === "about" && content.about && (
+                <>
+                    <SectionCard icon={FileText} title="Page copy">
+                        <div className="grid sm:grid-cols-2 gap-5">
+                            <Field label="Main title">
+                                <TextInput value={content.about.title} onChange={(e) => updateDeep(["about", "title"], e.target.value)} />
+                            </Field>
+                            <Field label="Subtitle">
+                                <TextInput value={content.about.subtitle} onChange={(e) => updateDeep(["about", "subtitle"], e.target.value)} />
+                            </Field>
+                        </div>
+                        <Field label="Full description">
+                            <TextArea rows={7} value={content.about.description} onChange={(e) => updateDeep(["about", "description"], e.target.value)} />
+                        </Field>
+                    </SectionCard>
+
+                    <SectionCard icon={BarChart3} title="Key metrics" description="Shown as highlight figures on the site.">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            {[
+                                { key: "experience", label: "Years experience" },
+                                { key: "staff", label: "Team size" },
+                                { key: "vessels", label: "Vessels" },
+                                { key: "provinces", label: "Provinces" },
+                            ].map((s) => (
+                                <div key={s.key} className="p-4 rounded-2xl bg-gradient-to-br from-grpsi-blue/[0.03] to-grpsi-blue/[0.08] ring-1 ring-grpsi-blue/10">
+                                    <Field label={s.label}>
+                                        <TextInput
+                                            className="text-xl font-black text-grpsi-blue"
+                                            value={content.about.stats?.[s.key]}
+                                            onChange={(e) => updateDeep(["about", "stats", s.key], e.target.value)}
+                                        />
+                                    </Field>
+                                </div>
+                            ))}
+                        </div>
+                    </SectionCard>
+                </>
+            )}
+
+            {/* SERVICES */}
+            {activeTab === "services" && (
+                <div className="space-y-4">
+                    {services.length === 0 && (
+                        <div className="text-center py-12 text-sm text-slate-400">No services yet. Add your first one below.</div>
+                    )}
+                    {services.map((service: any, index: number) => {
+                        const id = `services-${index}`;
+                        const open = !!expanded[id];
+                        return (
+                            <article key={service.id || index} className="bg-white/80 backdrop-blur rounded-[24px] ring-1 ring-slate-200/70 shadow-premium overflow-hidden">
+                                <div className="flex items-center gap-4 p-4 sm:p-5">
+                                    <button type="button" onClick={() => toggle(id)} className="flex flex-1 min-w-0 items-center gap-4 text-left" aria-expanded={open}>
+                                        <div className="h-14 w-20 shrink-0 rounded-xl overflow-hidden bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center">
+                                            {service.image
+                                                ? // eslint-disable-next-line @next/next/no-img-element
+                                                  <img src={service.image} alt="" className="w-full h-full object-cover" />
+                                                : <Ship className="w-5 h-5 text-slate-300" />}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-bold text-slate-900 truncate">{service.title || "Untitled service"}</p>
+                                            <p className="text-xs text-slate-400 truncate">
+                                                {(service.features || []).length} capabilities · icon: {service.icon || "—"}
+                                            </p>
+                                        </div>
+                                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                                    </button>
+                                    <IconButton danger label="Remove service" onClick={() => removeItem("services", index)}>
+                                        <Trash2 className="w-4 h-4" />
+                                    </IconButton>
+                                </div>
+
+                                {open && (
+                                    <div className="px-4 sm:px-6 pb-6 pt-2 space-y-5 border-t border-slate-100">
+                                        <div className="grid sm:grid-cols-2 gap-5 pt-4">
+                                            <Field label="Service title">
+                                                <TextInput className="font-semibold" value={service.title} onChange={(e) => updateItem("services", index, { title: e.target.value })} />
+                                            </Field>
+                                            <Field label="Icon" hint="One of: Ship, Fuel, HardHat">
+                                                <TextInput value={service.icon} onChange={(e) => updateItem("services", index, { icon: e.target.value })} />
+                                            </Field>
+                                        </div>
+                                        <Field label="Description">
+                                            <TextArea value={service.description} onChange={(e) => updateItem("services", index, { description: e.target.value })} />
+                                        </Field>
+                                        <ImageUploader label="Service image" currentUrl={service.image} onUpload={(url) => updateItem("services", index, { image: url })} onError={showError} />
+
+                                        <div className="space-y-2">
+                                            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                                                <Layers className="w-3.5 h-3.5 text-slate-400" />
+                                                Capabilities
+                                            </span>
+                                            <div className="space-y-2">
+                                                {(service.features || []).map((feature: string, fIndex: number) => (
+                                                    <div key={fIndex} className="flex items-center gap-2">
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-grpsi-gold shrink-0" />
+                                                        <TextInput
+                                                            className="py-2.5"
+                                                            value={feature}
+                                                            onChange={(e) => {
+                                                                const nextFeatures = [...(service.features || [])];
+                                                                nextFeatures[fIndex] = e.target.value;
+                                                                updateItem("services", index, { features: nextFeatures });
+                                                            }}
+                                                        />
+                                                        <IconButton danger label="Remove capability" onClick={() =>
+                                                            updateItem("services", index, { features: (service.features || []).filter((_: string, i: number) => i !== fIndex) })
+                                                        }>
+                                                            <X className="w-4 h-4" />
+                                                        </IconButton>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateItem("services", index, { features: [...(service.features || []), ""] })}
+                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-grpsi-blue hover:bg-grpsi-blue/5 transition-all"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                Add capability
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </article>
+                        );
+                    })}
+                    <AddButton
+                        onClick={() =>
+                            addItem("services", { id: `service-${Date.now()}`, title: "New Service", description: "", icon: "Ship", features: [], image: "" })
+                        }
+                    >
+                        Add service
+                    </AddButton>
                 </div>
             )}
 
-            {/* Editor Content */}
-            <div className="bg-white rounded-3xl p-10 shadow-sm border border-slate-200/60 font-sans">
-                
-                {/* HOME/LANDING EDITOR */}
-                {activeTab === "home" && content.home && (
-                    <div className="space-y-12">
-                        {/* Hero Section */}
-                        <div className="space-y-6">
-                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-3">
-                                <LayoutDashboard className="w-5 h-5 text-blue-600" />
-                                Hero Section
-                            </h3>
-                            <div className="grid grid-cols-2 gap-8">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Main Title</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none text-slate-900"
-                                        value={content.home.hero.title}
-                                        onChange={(e) => updateDeep(['home', 'hero', 'title'], e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Highlight Word</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none text-slate-900"
-                                        value={content.home.hero.highlight}
-                                        onChange={(e) => updateDeep(['home', 'hero', 'highlight'], e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Subtitle / Description</label>
-                                <textarea 
-                                    rows={3}
-                                    className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none resize-none text-slate-900"
-                                    value={content.home.hero.subtitle}
-                                    onChange={(e) => updateDeep(['home', 'hero', 'subtitle'], e.target.value)}
-                                />
-                            </div>
-
-                            {/* Hero Background Image */}
-                            <ImageUploader 
-                                label="Hero Background Image" 
-                                currentUrl={content.home.hero.backgroundImage}
-                                onUpload={(url) => updateDeep(['home', 'hero', 'backgroundImage'], url)}
-                            />
-                            
-                            {/* Buttons Editor */}
-                            <div className="grid grid-cols-2 gap-8">
-                                <div className="space-y-4 p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Primary Button</label>
-                                    <input 
-                                        type="text" className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900 text-sm"
-                                        placeholder="Label" value={content.home.hero.buttons?.primary?.label}
-                                        onChange={(e) => updateDeep(['home', 'hero', 'buttons', 'primary', 'label'], e.target.value)}
-                                    />
-                                    <input 
-                                        type="text" className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900 text-sm"
-                                        placeholder="Link" value={content.home.hero.buttons?.primary?.link}
-                                        onChange={(e) => updateDeep(['home', 'hero', 'buttons', 'primary', 'link'], e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-4 p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Secondary Button</label>
-                                    <input 
-                                        type="text" className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900 text-sm"
-                                        placeholder="Label" value={content.home.hero.buttons?.secondary?.label}
-                                        onChange={(e) => updateDeep(['home', 'hero', 'buttons', 'secondary', 'label'], e.target.value)}
-                                    />
-                                    <input 
-                                        type="text" className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900 text-sm"
-                                        placeholder="Link" value={content.home.hero.buttons?.secondary?.link}
-                                        onChange={(e) => updateDeep(['home', 'hero', 'buttons', 'secondary', 'link'], e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr className="border-slate-100" />
-
-                        {/* CTA Section */}
-                        <div className="space-y-6">
-                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-3">
-                                <CheckCircle className="w-5 h-5 text-green-600" />
-                                Call to Action (CTA)
-                            </h3>
-                            <div className="grid grid-cols-2 gap-8">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">CTA Title</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none text-slate-900"
-                                        value={content.home.cta.title}
-                                        onChange={(e) => updateDeep(['home', 'cta', 'title'], e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact Phone</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none text-slate-900"
-                                        value={content.home.cta.phone}
-                                        onChange={(e) => updateDeep(['home', 'cta', 'phone'], e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end pt-8 border-t border-slate-100">
-                            <button 
-                                onClick={() => handleSave("home", content.home)}
-                                disabled={isSaving}
-                                className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
-                            >
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Save Home Changes
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* ABOUT EDITOR */}
-                {activeTab === "about" && content.about && (
-                    <div className="space-y-8">
-                        <div className="grid grid-cols-2 gap-8">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Main Title</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none text-slate-900"
-                                    value={content.about.title || ""}
-                                    onChange={(e) => updateDeep(['about', 'title'], e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Subtitle</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none text-slate-900"
-                                    value={content.about.subtitle || ""}
-                                    onChange={(e) => updateDeep(['about', 'subtitle'], e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Stats Expansion */}
-                        <div className="p-8 bg-blue-50/50 rounded-3xl border border-blue-100/50 space-y-6">
-                            <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Operational Success Metrics</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Experience (Years)</label>
-                                    <input className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900"
-                                        value={content.about.stats.experience} onChange={(e) => updateDeep(['about', 'stats', 'experience'], e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Team Size</label>
-                                    <input className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900"
-                                        value={content.about.stats.staff} onChange={(e) => updateDeep(['about', 'stats', 'staff'], e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Vessels</label>
-                                    <input className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900"
-                                        value={content.about.stats.vessels} onChange={(e) => updateDeep(['about', 'stats', 'vessels'], e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Provinces</label>
-                                    <input className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-slate-900"
-                                        value={content.about.stats.provinces} onChange={(e) => updateDeep(['about', 'stats', 'provinces'], e.target.value)} />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Full Description</label>
-                            <textarea 
-                                rows={6}
-                                className="w-full px-6 py-4 bg-slate-50 rounded-xl border border-slate-100 focus:border-grpsi-blue outline-none resize-none text-slate-900"
-                                value={content.about.description || ""}
-                                onChange={(e) => updateDeep(['about', 'description'], e.target.value)}
-                            />
-                        </div>
-                        <div className="flex justify-end pt-8">
-                            <button 
-                                onClick={() => handleSave("about", content.about)}
-                                disabled={isSaving}
-                                className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
-                            >
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Save About Changes
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* FOOTER / SETTINGS EDITOR */}
-                {activeTab === "footer" && content.footer && (
-                    <div className="space-y-8">
-                        <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100 space-y-6">
-                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-3">
-                                <Globe className="w-5 h-5 text-blue-600" />
-                                Global Contact Information
-                            </h3>
-                            <div className="grid grid-cols-2 gap-8">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Headquarters Address</label>
-                                    <input type="text" className="w-full px-6 py-4 bg-white rounded-xl border border-slate-200 text-slate-900"
-                                        value={content.footer.address} onChange={(e) => updateDeep(['footer', 'address'], e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Official Email</label>
-                                    <input type="email" className="w-full px-6 py-4 bg-white rounded-xl border border-slate-200 text-slate-900"
-                                        value={content.footer.email} onChange={(e) => updateDeep(['footer', 'email'], e.target.value)} />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Company Description (Footer)</label>
-                                <textarea rows={3} className="w-full px-6 py-4 bg-white rounded-xl border border-slate-200 text-slate-900 resize-none"
-                                    value={content.footer.description} onChange={(e) => updateDeep(['footer', 'description'], e.target.value)} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact Phone</label>
-                                <input type="text" className="w-full px-6 py-4 bg-white rounded-xl border border-slate-200 text-slate-900"
-                                    value={content.footer.phone} onChange={(e) => updateDeep(['footer', 'phone'], e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="flex justify-end pt-8">
-                            <button 
-                                onClick={() => handleSave("footer", content.footer)}
-                                disabled={isSaving}
-                                className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
-                            >
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Save Global Settings
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* SERVICES EDITOR */}
-                {activeTab === "services" && (
-                    <div className="space-y-12">
-                        {(content.services || []).map((service: any, index: number) => (
-                            <div key={index} className="p-8 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-6">
-                                <div className="flex justify-between items-center">
-                                    <h4 className="font-bold text-grpsi-blue flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border border-slate-100 italic text-slate-400">{index + 1}</div>
-                                        {service.title}
-                                    </h4>
-                                    <button
-                                        type="button"
-                                        title="Remove service"
-                                        onClick={() => {
-                                            const next = content.services.filter((_: any, i: number) => i !== index);
-                                            setContent({ ...content, services: next });
-                                        }}
-                                        className="text-red-400 hover:text-red-500 transition-colors"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Service Title</label>
-                                        <input className="w-full px-6 py-4 rounded-xl border border-slate-200 text-slate-900 text-sm font-bold"
-                                            value={service.title} onChange={(e) => {
-                                                const next = [...content.services];
-                                                next[index] = { ...next[index], title: e.target.value };
-                                                setContent({ ...content, services: next });
-                                            }} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Icon (Ship, Fuel, HardHat)</label>
-                                        <input className="w-full px-6 py-4 rounded-xl border border-slate-200 text-slate-900 text-sm"
-                                            value={service.icon} onChange={(e) => {
-                                                const next = [...content.services];
-                                                next[index] = { ...next[index], icon: e.target.value };
-                                                setContent({ ...content, services: next });
-                                            }} />
-                                    </div>
-                                </div>
-                                <ImageUploader 
-                                    label="Service Visualization" 
-                                    currentUrl={service.image}
-                                    onUpload={(url) => {
-                                        const next = [...content.services];
-                                        next[index] = { ...next[index], image: url };
-                                        setContent({ ...content, services: next });
-                                    }}
-                                />
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</label>
-                                    <textarea rows={2} className="w-full px-6 py-4 rounded-xl border border-slate-200 text-slate-900 text-sm resize-none"
-                                        value={service.description} onChange={(e) => {
-                                            const next = [...content.services];
-                                            next[index] = { ...next[index], description: e.target.value };
-                                            setContent({ ...content, services: next });
-                                        }} />
-                                </div>
-                                <div className="space-y-4">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Capabilities Listing</label>
-                                    {(service.features || []).map((feature: string, fIndex: number) => (
-                                        <div key={fIndex} className="flex items-center gap-2">
-                                            <input className="w-full px-4 py-2 bg-white rounded-lg border border-slate-100 text-slate-900 text-xs"
-                                                value={feature} onChange={(e) => {
-                                                    const next = [...content.services];
-                                                    const nextFeatures = [...(next[index].features || [])];
-                                                    nextFeatures[fIndex] = e.target.value;
-                                                    next[index] = { ...next[index], features: nextFeatures };
-                                                    setContent({ ...content, services: next });
-                                                }} />
-                                            <button
-                                                type="button"
-                                                title="Remove capability"
-                                                onClick={() => {
-                                                    const next = [...content.services];
-                                                    const nextFeatures = (next[index].features || []).filter((_: string, i: number) => i !== fIndex);
-                                                    next[index] = { ...next[index], features: nextFeatures };
-                                                    setContent({ ...content, services: next });
-                                                }}
-                                                className="text-red-300 hover:text-red-500 transition-colors shrink-0"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
+            {/* PROJECTS */}
+            {activeTab === "projects" && (
+                <div className="space-y-4">
+                    {projects.length === 0 && (
+                        <div className="text-center py-12 text-sm text-slate-400">No projects yet. Add your first one below.</div>
+                    )}
+                    {projects.map((project: any, index: number) => {
+                        const id = `projects-${index}`;
+                        const open = !!expanded[id];
+                        return (
+                            <article key={index} className="bg-white/80 backdrop-blur rounded-[24px] ring-1 ring-slate-200/70 shadow-premium overflow-hidden">
+                                <div className="flex items-center gap-4 p-4 sm:p-5">
+                                    <button type="button" onClick={() => toggle(id)} className="flex flex-1 min-w-0 items-center gap-4 text-left" aria-expanded={open}>
+                                        <div className="h-14 w-20 shrink-0 rounded-xl overflow-hidden bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center">
+                                            {project.image
+                                                ? // eslint-disable-next-line @next/next/no-img-element
+                                                  <img src={project.image} alt="" className="w-full h-full object-cover" />
+                                                : <ImageIcon className="w-5 h-5 text-slate-300" />}
                                         </div>
-                                    ))}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const next = [...content.services];
-                                            next[index] = { ...next[index], features: [...(next[index].features || []), ""] };
-                                            setContent({ ...content, services: next });
-                                        }}
-                                        className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-grpsi-blue transition-colors"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" />
-                                        Add Capability
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const next = [...(content.services || []), {
-                                    id: `service-${Date.now()}`,
-                                    title: "New Service",
-                                    description: "",
-                                    icon: "Ship",
-                                    features: [],
-                                    image: ""
-                                }];
-                                setContent({ ...content, services: next });
-                            }}
-                            className="w-full flex items-center justify-center gap-3 py-6 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-xs hover:border-grpsi-blue hover:text-grpsi-blue transition-all"
-                        >
-                            <Plus className="w-5 h-5" />
-                            Add Service
-                        </button>
-                        <div className="flex justify-end pt-8 border-t border-slate-100">
-                            <button
-                                onClick={() => handleSave("services", content.services || [])}
-                                disabled={isSaving}
-                                className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
-                            >
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Save Services
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* PROJECTS EDITOR */}
-                {activeTab === "projects" && (
-                    <div className="space-y-12">
-                        {(content.projects || []).map((project: any, index: number) => (
-                            <div key={index} className="flex flex-col lg:flex-row gap-8 p-8 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="w-full lg:w-48 h-32 rounded-xl border border-white overflow-hidden shadow-sm shrink-0 bg-slate-100 flex items-center justify-center">
-                                    {project.image
-                                        ? <img src={project.image} className="w-full h-full object-cover" alt="Fleet Project" />
-                                        : <ImageIcon className="w-8 h-8 text-slate-300" />}
-                                </div>
-                                <div className="flex-1 space-y-4">
-                                    <div className="flex justify-between items-center gap-4">
-                                        <div className="flex items-center gap-2">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold">Category</label>
-                                            <select className="px-3 py-2 rounded-lg border border-slate-200 text-slate-900 text-xs bg-white"
-                                                value={project.category || 'Engineering'} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], category: e.target.value };
-                                                    setContent({ ...content, projects: next });
-                                                }}>
-                                                <option>Engineering</option>
-                                                <option>Logistics</option>
-                                                <option>Fuel</option>
-                                            </select>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            title="Remove project"
-                                            onClick={() => {
-                                                const next = content.projects.filter((_: any, i: number) => i !== index);
-                                                setContent({ ...content, projects: next });
-                                            }}
-                                            className="text-red-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <div className="col-span-2 space-y-1">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Project Name</label>
-                                            <input 
-                                                className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-grpsi-blue/20 outline-none transition-all"
-                                                value={project.title} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], title: e.target.value };
-                                                    setContent({ ...content, projects: next });
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold ml-1 flex items-center gap-1"><Link2 className="w-2.5 h-2.5" /> URL Slug</label>
-                                            <input 
-                                                className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm font-mono text-slate-600 bg-slate-50/50"
-                                                placeholder="auk-port-2024"
-                                                value={project.slug || ''} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], slug: e.target.value.toLowerCase().replace(/\s+/g, '-') };
-                                                    setContent({ ...content, projects: next });
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Location</label>
-                                            <input 
-                                                className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm text-slate-900"
-                                                value={project.location} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], location: e.target.value };
-                                                    setContent({ ...content, projects: next });
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Year</label>
-                                            <input 
-                                                className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm text-slate-900"
-                                                value={project.year} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], year: e.target.value };
-                                                    setContent({ ...content, projects: next });
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Grid Operational Summary (Short)</label>
-                                        <textarea 
-                                            rows={2}
-                                            className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm text-slate-900 resize-none font-sans"
-                                            value={project.description} onChange={(e) => {
-                                                const next = [...content.projects];
-                                                next[index] = { ...next[index], description: e.target.value };
-                                                setContent({ ...content, projects: next });
-                                            }}
-                                        />
-                                    </div>
-
-                                    {/* Detailed Case Study Sections */}
-                                    <div className="p-6 bg-white rounded-2xl border border-slate-100 space-y-6 shadow-sm">
-                                        <h4 className="text-xs font-black uppercase tracking-[0.2em] text-grpsi-blue flex items-center gap-2 mb-2">
-                                            <BookOpen className="w-4 h-4 text-grpsi-gold" /> Technical Case Study Details
-                                        </h4>
-                                        
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold ml-1 flex items-center gap-2">
-                                                <Target className="w-3 h-3" /> The Challenge
-                                            </label>
-                                            <textarea 
-                                                rows={3}
-                                                placeholder="What were the maritime or logistical obstacles?"
-                                                className="w-full px-4 py-3 bg-slate-50/30 rounded-xl border border-slate-200 text-sm text-slate-800"
-                                                value={project.challenge || ''} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], challenge: e.target.value };
-                                                    setContent({ ...content, projects: next });
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold ml-1 flex items-center gap-2">
-                                                <Lightbulb className="w-3 h-3" /> Our Solution
-                                            </label>
-                                            <textarea 
-                                                rows={3}
-                                                placeholder="How did GPRSI overcome these through engineering or fleet logistics?"
-                                                className="w-full px-4 py-3 bg-slate-50/30 rounded-xl border border-slate-200 text-sm text-slate-800"
-                                                value={project.solution || ''} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], solution: e.target.value };
-                                                    setContent({ ...content, projects: next });
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase text-slate-400 font-bold ml-1 flex items-center gap-2">
-                                                <Trophy className="w-3 h-3" /> The Final Result
-                                            </label>
-                                            <textarea 
-                                                rows={3}
-                                                placeholder="What was the lasting impact on the region?"
-                                                className="w-full px-4 py-3 bg-slate-50/30 rounded-xl border border-slate-200 text-sm text-slate-800"
-                                                value={project.result || ''} onChange={(e) => {
-                                                    const next = [...content.projects];
-                                                    next[index] = { ...next[index], result: e.target.value };
-                                                    setContent({ ...content, projects: next });
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <ImageUploader 
-                                        label="Project Showcase Image" 
-                                        currentUrl={project.image}
-                                        onUpload={(url) => {
-                                            const next = [...content.projects];
-                                            next[index] = { ...next[index], image: url };
-                                            setContent({ ...content, projects: next });
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const next = [...(content.projects || []), {
-                                    title: "New Project",
-                                    slug: "",
-                                    location: "",
-                                    year: String(new Date().getFullYear()),
-                                    category: "Engineering",
-                                    image: "",
-                                    description: "",
-                                    challenge: "",
-                                    solution: "",
-                                    result: ""
-                                }];
-                                setContent({ ...content, projects: next });
-                            }}
-                            className="w-full flex items-center justify-center gap-3 py-6 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-xs hover:border-grpsi-blue hover:text-grpsi-blue transition-all"
-                        >
-                            <Plus className="w-5 h-5" />
-                            Add Project
-                        </button>
-                        <div className="flex justify-end pt-8 border-t border-slate-100">
-                            <button
-                                onClick={() => handleSave("projects", content.projects || [])}
-                                disabled={isSaving}
-                                className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
-                            >
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Save Fleet Portfolio
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === "footer" && (
-                    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 bg-slate-50/50 p-12 rounded-[2.5rem] border border-slate-100">
-                            <div className="col-span-2 space-y-1">
-                                <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Company Global Mission</label>
-                                <textarea 
-                                    rows={3}
-                                    className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm text-slate-900 font-medium"
-                                    value={content.footer?.description || ''} onChange={(e) => updateDeep(['footer', 'description'], e.target.value)}
-                                />
-                            </div>
-                            
-                            <div className="space-y-1">
-                                <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Headquarters (Physical)</label>
-                                <input 
-                                    className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-                                    value={content.footer?.address || ''} onChange={(e) => updateDeep(['footer', 'address'], e.target.value)}
-                                />
-                            </div>
-                            
-                            <div className="space-y-1">
-                                <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Operations Email</label>
-                                <input 
-                                    className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-                                    value={content.footer?.email || ''} onChange={(e) => updateDeep(['footer', 'email'], e.target.value)}
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[10px] uppercase text-slate-400 font-bold ml-1">Central Phone Relay</label>
-                                <input 
-                                    className="w-full px-4 py-3 bg-white rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-                                    value={content.footer?.phone || ''} onChange={(e) => updateDeep(['footer', 'phone'], e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="bg-slate-50/50 p-12 rounded-[2.5rem] border border-slate-100">
-                            <h3 className="text-xl font-bold text-slate-900 mb-8 border-b border-slate-200 pb-4">Social Connectivity</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                {(content.footer?.social || []).map((social: any, i: number) => (
-                                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-grpsi-gold">
-                                                {social.platform === 'Globe' && <Globe className="w-5 h-5" />}
-                                                {social.platform === 'Ship' && <Ship className="w-5 h-5" />}
-                                                {social.platform === 'Users' && <Users className="w-5 h-5" />}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-bold text-slate-900 truncate">{project.title || "Untitled project"}</p>
+                                                <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-grpsi-gold/20 text-[10px] font-bold uppercase tracking-wider text-grpsi-blue">
+                                                    {project.category || "Engineering"}
+                                                </span>
                                             </div>
-                                            <span className="font-bold text-slate-900">{social.platform}</span>
+                                            <p className="text-xs text-slate-400 truncate">
+                                                {[project.location, project.year].filter(Boolean).join(" · ") || "No location set"}
+                                            </p>
                                         </div>
-                                        <input 
-                                            className="w-full px-3 py-2 bg-slate-50 rounded-lg border border-slate-100 text-xs text-slate-500 font-mono"
-                                            value={social.url} onChange={(e) => {
-                                                const next = [...content.footer.social];
-                                                next[i] = { ...next[i], url: e.target.value };
-                                                updateDeep(['footer', 'social'], next);
-                                            }}
-                                            placeholder="https://..."
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                                    </button>
+                                    <IconButton danger label="Remove project" onClick={() => removeItem("projects", index)}>
+                                        <Trash2 className="w-4 h-4" />
+                                    </IconButton>
+                                </div>
 
-                        <div className="flex justify-end pt-8 border-t border-slate-100">
-                            <button 
-                                onClick={() => handleSave("footer", content.footer)}
-                                disabled={isSaving}
-                                className="flex items-center gap-3 px-12 py-5 bg-grpsi-blue text-white rounded-full font-bold uppercase tracking-widest hover:bg-grpsi-blue-light transition-all disabled:opacity-50 shadow-premium"
-                            >
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Synchronize Global Settings
-                            </button>
+                                {open && (
+                                    <div className="px-4 sm:px-6 pb-6 pt-2 space-y-5 border-t border-slate-100">
+                                        <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-5 pt-4">
+                                            <Field label="Project name" className="sm:col-span-2 lg:col-span-3">
+                                                <TextInput className="font-semibold" value={project.title} onChange={(e) => updateItem("projects", index, { title: e.target.value })} />
+                                            </Field>
+                                            <Field label="Category" className="lg:col-span-3">
+                                                <select
+                                                    className={inputCls}
+                                                    value={project.category || "Engineering"}
+                                                    onChange={(e) => updateItem("projects", index, { category: e.target.value })}
+                                                >
+                                                    <option>Engineering</option>
+                                                    <option>Logistics</option>
+                                                    <option>Fuel</option>
+                                                </select>
+                                            </Field>
+                                            <Field label="URL slug" icon={Link2} hint={project.slug ? `/projects/${project.slug}` : undefined} className="lg:col-span-2">
+                                                <TextInput
+                                                    className="font-mono"
+                                                    placeholder="auk-port-2024"
+                                                    value={project.slug}
+                                                    onChange={(e) => updateItem("projects", index, { slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })}
+                                                />
+                                            </Field>
+                                            <Field label="Location" icon={MapPin} className="lg:col-span-2">
+                                                <TextInput value={project.location} onChange={(e) => updateItem("projects", index, { location: e.target.value })} />
+                                            </Field>
+                                            <Field label="Year" className="lg:col-span-2">
+                                                <TextInput value={project.year} onChange={(e) => updateItem("projects", index, { year: e.target.value })} />
+                                            </Field>
+                                        </div>
+                                        <Field label="Short summary" hint="Shown on the project card in the portfolio grid.">
+                                            <TextArea rows={2} value={project.description} onChange={(e) => updateItem("projects", index, { description: e.target.value })} />
+                                        </Field>
+                                        <ImageUploader label="Showcase image" currentUrl={project.image} onUpload={(url) => updateItem("projects", index, { image: url })} onError={showError} />
+
+                                        <div className="rounded-2xl bg-slate-50 ring-1 ring-slate-200/70 p-4 sm:p-5 space-y-4">
+                                            <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                                <BookOpen className="w-4 h-4 text-grpsi-blue" />
+                                                Case study
+                                            </p>
+                                            <Field label="The challenge" icon={Target}>
+                                                <TextArea placeholder="What were the maritime or logistical obstacles?" value={project.challenge} onChange={(e) => updateItem("projects", index, { challenge: e.target.value })} />
+                                            </Field>
+                                            <Field label="Our solution" icon={Lightbulb}>
+                                                <TextArea placeholder="How did GPRSI overcome them?" value={project.solution} onChange={(e) => updateItem("projects", index, { solution: e.target.value })} />
+                                            </Field>
+                                            <Field label="The result" icon={Trophy}>
+                                                <TextArea placeholder="What was the lasting impact on the region?" value={project.result} onChange={(e) => updateItem("projects", index, { result: e.target.value })} />
+                                            </Field>
+                                        </div>
+                                    </div>
+                                )}
+                            </article>
+                        );
+                    })}
+                    <AddButton
+                        onClick={() =>
+                            addItem("projects", {
+                                title: "New Project", slug: "", location: "", year: String(new Date().getFullYear()), category: "Engineering",
+                                image: "", description: "", challenge: "", solution: "", result: "",
+                            })
+                        }
+                    >
+                        Add project
+                    </AddButton>
+                </div>
+            )}
+
+            {/* GLOBAL SETTINGS */}
+            {activeTab === "footer" && content.footer && (
+                <>
+                    <SectionCard icon={Globe} title="Contact information" description="Used in the footer and contact page.">
+                        <div className="grid sm:grid-cols-2 gap-5">
+                            <Field label="Headquarters address" icon={MapPin} className="sm:col-span-2">
+                                <TextInput value={content.footer.address} onChange={(e) => updateDeep(["footer", "address"], e.target.value)} />
+                            </Field>
+                            <Field label="Email" icon={Mail}>
+                                <TextInput type="email" value={content.footer.email} onChange={(e) => updateDeep(["footer", "email"], e.target.value)} />
+                            </Field>
+                            <Field label="Phone" icon={Phone}>
+                                <TextInput value={content.footer.phone} onChange={(e) => updateDeep(["footer", "phone"], e.target.value)} />
+                            </Field>
                         </div>
-                    </div>
-                )}
+                        <Field label="Footer description">
+                            <TextArea value={content.footer.description} onChange={(e) => updateDeep(["footer", "description"], e.target.value)} />
+                        </Field>
+                    </SectionCard>
+
+                    {(content.footer.social || []).length > 0 && (
+                        <SectionCard icon={Share2} title="Social links">
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {content.footer.social.map((social: any, i: number) => {
+                                    const SocialIcon = social.platform === "Ship" ? Ship : social.platform === "Users" ? Users : Globe;
+                                    return (
+                                        <div key={i} className="p-4 rounded-2xl bg-slate-50 ring-1 ring-slate-200/70 space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-9 w-9 rounded-xl bg-grpsi-blue text-grpsi-gold flex items-center justify-center">
+                                                    <SocialIcon className="w-4 h-4" />
+                                                </div>
+                                                <span className="font-semibold text-sm text-slate-900">{social.platform}</span>
+                                            </div>
+                                            <TextInput
+                                                className="font-mono text-xs"
+                                                placeholder="https://…"
+                                                value={social.url}
+                                                onChange={(e) => {
+                                                    const next = [...content.footer.social];
+                                                    next[i] = { ...next[i], url: e.target.value };
+                                                    updateDeep(["footer", "social"], next);
+                                                }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </SectionCard>
+                    )}
+                </>
+            )}
+
+            {/* Floating save bar */}
+            <div className="fixed bottom-4 inset-x-4 lg:left-auto lg:right-10 z-30 flex justify-center lg:justify-end pointer-events-none">
+                <div className="pointer-events-auto flex items-center gap-3 pl-5 pr-2 py-2 rounded-2xl bg-white/90 backdrop-blur-xl ring-1 ring-slate-200 shadow-2xl shadow-slate-900/10">
+                    <span className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                        <span className={`h-2 w-2 rounded-full ${isDirty ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
+                        {isDirty ? "Unsaved changes" : "All changes saved"}
+                    </span>
+                    {isDirty && (
+                        <button type="button" onClick={discardChanges} className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all">
+                            Discard
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => handleSave(tab.collection, content[tab.collection] ?? (tab.collection === "services" || tab.collection === "projects" ? [] : {}))}
+                        disabled={isSaving || !isDirty}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-grpsi-blue text-white rounded-xl font-semibold text-sm hover:bg-grpsi-blue-light transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        {isSaving ? "Publishing…" : "Publish"}
+                    </button>
+                </div>
             </div>
+
+            {/* Toast */}
+            {toast && (
+                <div
+                    role={toast.type === "error" ? "alert" : "status"}
+                    className={`fixed top-4 right-4 z-[60] max-w-sm flex items-start gap-3 pl-4 pr-2 py-3 rounded-2xl shadow-2xl ring-1 backdrop-blur-xl ${
+                        toast.type === "success" ? "bg-emerald-50/95 ring-emerald-200 text-emerald-800" : "bg-red-50/95 ring-red-200 text-red-700"
+                    }`}
+                >
+                    {toast.type === "success" ? <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0" /> : <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />}
+                    <p className="text-sm font-medium flex-1">{toast.message}</p>
+                    <button type="button" onClick={() => setToast(null)} aria-label="Dismiss" className="h-7 w-7 rounded-lg flex items-center justify-center opacity-60 hover:opacity-100">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

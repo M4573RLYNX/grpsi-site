@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Key, Loader2, ArrowRight } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { KeyRound, Loader2, ArrowRight, Eye, EyeOff, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function AdminLoginPage() {
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const router = useRouter();
@@ -16,8 +19,8 @@ export default function AdminLoginPage() {
         setError("");
 
         try {
-            const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
-            const loginUrl = apiBase.endsWith('/api') ? `${apiBase}/auth/login` : `${apiBase}/api/auth/login`;
+            const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
+            const loginUrl = apiBase.endsWith("/api") ? `${apiBase}/auth/login` : `${apiBase}/api/auth/login`;
 
             const res = await fetch(loginUrl, {
                 method: "POST",
@@ -31,65 +34,95 @@ export default function AdminLoginPage() {
                 localStorage.setItem("gprsi_admin_token", data.token);
                 router.push("/admin");
             } else {
-                setError(data.error || "Login Failed");
+                setError(data.error || "Login failed.");
             }
-        } catch (err) {
-            setError("Server unreachable. Check backend connection.");
+        } catch {
+            setError("Server unreachable. Check the backend connection.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-sans">
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-blue-500/10 rounded-full blur-[150px] -mr-40 -mt-40" />
-                <div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-blue-400/5 rounded-full blur-[120px] -ml-20 -mb-20" />
+        <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-blue-50/60 flex items-center justify-center p-4 sm:p-6 font-sans">
+            {/* Ambient shapes */}
+            <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -top-40 -right-40 h-[480px] w-[480px] rounded-full bg-grpsi-blue/10 blur-[120px]" />
+                <div className="absolute -bottom-40 -left-40 h-[420px] w-[420px] rounded-full bg-grpsi-gold/15 blur-[120px]" />
             </div>
 
-            <div className="w-full max-w-lg bg-white/5 backdrop-blur-3xl p-16 rounded-[2.5rem] border border-white/10 shadow-2xl relative z-10 transition-all">
-                <div className="text-center mb-12">
-                    <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-premium transform rotate-3">
-                        <Shield className="w-10 h-10 text-slate-900" />
-                    </div>
-                    <h1 className="text-white text-4xl font-black tracking-tighter mb-4">GPRSI Center</h1>
-                    <p className="text-white/40 uppercase tracking-[0.3em] font-bold text-xs">Security Checkpoint</p>
-                </div>
+            <Link
+                href="/"
+                className="absolute top-5 left-5 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-500 hover:text-grpsi-blue hover:bg-white/70 transition-all"
+            >
+                <ArrowLeft className="w-4 h-4" />
+                Back to website
+            </Link>
 
-                <form onSubmit={handleLogin} className="space-y-8">
-                    <div className="space-y-3">
-                        <label className="text-white/40 text-[10px] uppercase tracking-[0.2em] font-bold ml-1">Access Credentials</label>
-                        <div className="relative group">
-                            <Key className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-white transition-colors" />
-                            <input 
-                                type="password" 
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-white/5 text-white border border-white/10 px-16 py-5 rounded-2xl outline-none focus:border-white/30 focus:bg-white/10 transition-all font-mono"
-                                placeholder="Admin Token"
-                            />
+            <div className="relative w-full max-w-md">
+                <div className="bg-white/80 backdrop-blur-xl rounded-[32px] ring-1 ring-slate-200/70 shadow-2xl shadow-grpsi-blue/10 p-8 sm:p-10">
+                    <div className="flex flex-col items-center text-center mb-8">
+                        <div className="h-16 w-16 rounded-[22px] bg-white ring-1 ring-slate-200 shadow-premium flex items-center justify-center mb-5">
+                            <Image src="/logo.png" alt="GPRSI" width={48} height={48} className="object-contain" priority />
                         </div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-grpsi-blue/50 mb-1">GPRSI Admin</p>
+                        <h1 className="text-2xl font-black tracking-tight text-slate-900">Welcome back</h1>
+                        <p className="text-sm text-slate-500 mt-1">Sign in to manage website content.</p>
                     </div>
 
-                    {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-4 rounded-xl text-center text-sm font-bold animate-shake">
-                            Authentication Failed: {error}
-                        </div>
-                    )}
+                    <form onSubmit={handleLogin} className="space-y-5">
+                        <label className="block space-y-2">
+                            <span className="text-xs font-semibold text-slate-600">Admin password</span>
+                            <div className="relative">
+                                <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    autoFocus
+                                    autoComplete="current-password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full pl-11 pr-12 py-3.5 bg-white rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-300 outline-none transition-all hover:border-slate-300 focus:border-grpsi-blue focus:ring-4 focus:ring-grpsi-blue/10"
+                                    placeholder="Enter password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((s) => !s)}
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                                >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        </label>
 
-                    <button 
-                        disabled={loading}
-                        className="w-full bg-white text-slate-900 py-5 rounded-2xl font-black uppercase tracking-[0.3em] shadow-premium hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    >
-                        {loading ? <Loader2 className="w-6 h-6 animate-spin text-slate-900" /> : "Verify Access"}
-                        {!loading && <ArrowRight className="w-5 h-5 ml-1" />}
-                    </button>
-                </form>
+                        {error && (
+                            <div role="alert" className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-50 ring-1 ring-red-200 text-sm font-medium text-red-700">
+                                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                {error}
+                            </div>
+                        )}
 
-                <div className="mt-12 pt-8 border-t border-white/5 text-center">
-                    <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest">Global Maritime Logistical Integration</p>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="group w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl bg-grpsi-blue text-white font-semibold text-sm shadow-lg shadow-grpsi-blue/25 hover:bg-grpsi-blue-light active:scale-[0.99] transition-all disabled:opacity-60"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Signing in…
+                                </>
+                            ) : (
+                                <>
+                                    Sign in
+                                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                                </>
+                            )}
+                        </button>
+                    </form>
                 </div>
+                <p className="text-center text-xs text-slate-400 mt-6">Authorised personnel only.</p>
             </div>
         </div>
     );
