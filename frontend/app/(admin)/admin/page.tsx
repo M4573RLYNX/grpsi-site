@@ -114,10 +114,17 @@ function ImageUploader({ label, currentUrl, onUpload, onError }: { label: string
 
         setUploading(true);
         try {
-            const response = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+            const token = localStorage.getItem("gprsi_admin_token");
+            const response = await fetch(`/api/upload?filename=${encodeURIComponent(file.name)}`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "Content-Type": file.type || "application/octet-stream" },
+                body: file,
+            });
             if (response.ok) {
                 const blob = await response.json();
                 onUpload(blob.url);
+            } else if (response.status === 401) {
+                onError("Your session has expired. Log out and log in again to upload images.");
             } else {
                 const err = await response.json().catch(() => ({}));
                 onError(`Upload failed: ${err.error || "Server error"}`);
