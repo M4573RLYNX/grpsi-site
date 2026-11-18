@@ -2,19 +2,17 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #000a12;
-  /* Deep Slate */
+  --foreground: #0f172a;
 
-  /* GPRSI Modern Palette */
-  --grpsi-blue: #002B5B;
-  /* Deep Navy */
+  /* GPRSI palette */
+  --grpsi-blue: #002B5B;       /* Deep navy */
   --grpsi-blue-light: #1A5F7A;
-  --grpsi-gold: #FFD700;
-  /* Coral Gold */
+  --grpsi-gold: #FFD700;       /* Accent only — never as text on light surfaces */
   --grpsi-gold-muted: #E6C200;
   --grpsi-slate: #334155;
-  /* Professional Gray */
   --grpsi-white: #F8FAFC;
+
+  color-scheme: light;
 }
 
 @theme {
@@ -28,21 +26,14 @@
   --color-grpsi-slate: var(--grpsi-slate);
   --color-grpsi-white: var(--grpsi-white);
 
-  --font-sans: "Outfit", var(--font-geist-sans), sans-serif;
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
 
   --shadow-premium: 0 4px 20px -5px rgba(0, 43, 91, 0.08), 0 2px 10px -4px rgba(0, 43, 91, 0.03);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #000c19;
-    /* Darker navy */
-    --foreground: #f1f5f9;
-  }
+  --shadow-float: 0 24px 60px -24px rgba(0, 43, 91, 0.28);
 }
 
 body {
@@ -52,21 +43,42 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Glassmorphism Utility */
-.glass {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  /* Very subtle */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
-.dark .glass {
-  background: rgba(0, 12, 25, 0.75);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-/* GPRSI Corporate Blue Logo Filter - Target: #002B5B from White PNG */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hide scrollbar while keeping scroll (e.g. horizontal filter pills on mobile) */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Recolours the white logo PNG to GPRSI navy (#002B5B) */
 .filter-grpsi-blue {
   filter: invert(90%) sepia(95%) saturate(3062%) hue-rotate(205deg) brightness(92%) contrast(108%);
 }

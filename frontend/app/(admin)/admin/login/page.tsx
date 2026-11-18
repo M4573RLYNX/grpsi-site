@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { apiUrl } from "@/lib/api-url";
 import { KeyRound, Loader2, ArrowRight, Eye, EyeOff, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function AdminLoginPage() {
@@ -19,10 +20,7 @@ export default function AdminLoginPage() {
         setError("");
 
         try {
-            const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
-            const loginUrl = apiBase.endsWith("/api") ? `${apiBase}/auth/login` : `${apiBase}/api/auth/login`;
-
-            const res = await fetch(loginUrl, {
+            const res = await fetch(apiUrl("/auth/login"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ password }),

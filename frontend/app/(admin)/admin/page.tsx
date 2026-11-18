@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { apiUrl } from "@/lib/api-url";
 import {
     Save, RefreshCw, Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Globe, Briefcase, FileText,
     Settings, Upload, Image as ImageIcon, Ship, Users, Link2, BookOpen, Target, Lightbulb, Trophy,
@@ -22,10 +23,11 @@ const TABS: Record<string, { title: string; description: string; icon: any; coll
     footer: { title: "Global Settings", description: "Contact details, footer copy and social links used on every page.", icon: Settings, collection: "footer", viewHref: "/" },
 };
 
-const apiUrl = (path: string) => {
-    const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
-    return apiBase.endsWith("/api") ? `${apiBase}${path}` : `${apiBase}/api${path}`;
-};
+/** Asks the public site to drop its cached content so the publish shows up immediately. */
+const refreshPublicSite = (token: string | null) =>
+    fetch("/api/revalidate", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {
+        // Non-fatal: the public site also refreshes on its own every 5 minutes.
+    });
 
 /* ------------------------------------------------------------------ */
 /* UI primitives                                                       */
@@ -241,6 +243,7 @@ function AdminEditor() {
 
             if (res.ok) {
                 setSaved((prev: any) => ({ ...prev, [collection]: updatedData }));
+                refreshPublicSite(token);
                 setToast({ type: "success", message: "Changes published to the live site." });
             } else if (res.status === 403 || res.status === 401) {
                 showError("Your session has expired. Log out and log in again to continue.");

@@ -166,6 +166,11 @@ app.get('/api/about', async (req, res) => {
     res.json(data.about || {});
 });
 
+// Verify an admin token (used by the frontend to authorize cache revalidation)
+app.get('/api/admin/verify', authenticateToken, (req, res) => {
+    res.json({ ok: true });
+});
+
 // Admin Update Content (Protected)
 app.post('/api/admin/update', authenticateToken, async (req, res) => {
     const { collection, itemIndex, updatedItem, fullCollection } = req.body;

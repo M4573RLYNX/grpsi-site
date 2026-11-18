@@ -1,195 +1,74 @@
-"use client";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { getContent } from "@/lib/content";
+import ContactForm from "@/components/ContactForm";
+import { Container, IconBadge, PageHeader, cn, focusRing, surface, telHref } from "@/components/ui";
 
-import { motion } from "framer-motion";
-import Navbar from '@/components/Navbar';
-import SectionHeading from '@/components/SectionHeading';
-import { Mail, Phone, MapPin, Clock, Send, Globe } from 'lucide-react';
-import { useState } from "react";
+export const metadata: Metadata = {
+    title: "Contact",
+    description: "Get in touch with GRP & Associates in Honiara about logistics, engineering or fuel supply.",
+};
 
-export default function ContactPage() {
-    const [formState, setFormState] = useState({ name: "", email: "", subject: "", message: "" });
-    const [isSubmitted, setIsSubmitted] = useState(false);
+export default async function ContactPage() {
+    const { footer } = await getContent();
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitted(true);
-        setTimeout(() => setIsSubmitted(false), 5000);
-    };
+    const details = [
+        footer.phone && { label: "Call us", value: footer.phone, href: telHref(footer.phone), icon: Phone },
+        footer.email && { label: "Email us", value: footer.email, href: `mailto:${footer.email}`, icon: Mail },
+        footer.address && { label: "Visit us", value: footer.address, icon: MapPin },
+    ].filter(Boolean) as { label: string; value: string; href?: string; icon: typeof Phone }[];
 
     return (
         <>
-            <Navbar />
-            <main className="pt-20 bg-grpsi-blue">
-                {/* Page Header */}
-                <section className="bg-grpsi-blue py-24 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-grpsi-gold/10 rounded-full blur-[150px] -mr-40" />
-                    <div className="max-w-7xl mx-auto px-6 text-center relative z-10">
-                        <motion.h1
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-5xl md:text-7xl font-bold mb-6 tracking-tighter"
-                        >
-                            Contact Us
-                        </motion.h1>
-                        <p className="text-xl text-blue-100 max-w-2xl mx-auto">
-                            Headquartered in Honiara, GPRSI is ready to support your inter-island
-                            logistics and engineering requirements across the archipelago.
-                        </p>
+            <PageHeader
+                eyebrow="Contact"
+                title="Let's talk about your project"
+                description="Whether it's a charter, a construction tender or a fuel contract, our Honiara team is ready to help."
+            />
+
+            <Container className="pb-12">
+                <div className="grid gap-5 lg:grid-cols-5 items-start">
+                    <div className={cn(surface.dark, "lg:col-span-2 p-6 sm:p-8")}>
+                        <h2 className="text-xl font-bold">Contact details</h2>
+                        {details.length > 0 ? (
+                            <ul className="mt-6 space-y-3">
+                                {details.map((d) => {
+                                    const inner = (
+                                        <>
+                                            <IconBadge icon={d.icon} tone="onDark" />
+                                            <span className="min-w-0">
+                                                <span className="block text-sm text-white/60">{d.label}</span>
+                                                <span className="block font-semibold break-words">{d.value}</span>
+                                            </span>
+                                        </>
+                                    );
+                                    return (
+                                        <li key={d.label}>
+                                            {d.href ? (
+                                                <a href={d.href} className={cn(focusRing, "flex items-center gap-4 rounded-2xl p-2 -m-2 hover:bg-white/5 transition-all focus-visible:ring-white")}>
+                                                    {inner}
+                                                </a>
+                                            ) : (
+                                                <div className="flex items-center gap-4">{inner}</div>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <p className="mt-4 text-white/70">Contact details are being updated.</p>
+                        )}
                     </div>
-                </section>
 
-                <section className="py-32 px-6 bg-white">
-                    <div className="max-w-7xl mx-auto">
-                        <div className="flex flex-col lg:flex-row gap-20">
-                            {/* Contact Info */}
-                            <div className="flex-1">
-                                <SectionHeading title="Get In Touch" subtitle="Global Reach" />
-                                <div className="space-y-12">
-                                    <div className="flex gap-6 items-start group">
-                                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-grpsi-blue group-hover:text-white transition-all duration-300 shadow-sm">
-                                            <MapPin className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-grpsi-blue text-lg mb-2">Headquarters</h4>
-                                            <p className="text-slate-500 max-w-xs leading-relaxed">
-                                                Lot 15, Kukum Highway, Honiara, Solomon Islands
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-6 items-start group">
-                                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-grpsi-blue group-hover:text-white transition-all duration-300 shadow-sm">
-                                            <Phone className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-grpsi-blue text-lg mb-2">Direct Line</h4>
-                                            <p className="text-slate-500">+677 24567 / +677 24568</p>
-                                            <p className="text-slate-400 text-sm mt-1 uppercase tracking-widest font-medium">Mon-Fri: 8am-5pm</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-6 items-start group">
-                                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-grpsi-blue group-hover:text-white transition-all duration-300 shadow-sm">
-                                            <Mail className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-grpsi-blue text-lg mb-2">General Inquiries</h4>
-                                            <p className="text-slate-500">info@grpsi.com</p>
-                                            <p className="text-slate-500">logistics@grpsi.com</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-6 items-start group">
-                                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover:bg-grpsi-blue group-hover:text-white transition-all duration-300 shadow-sm">
-                                            <Clock className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-grpsi-blue text-lg mb-2">Emergency Support</h4>
-                                            <p className="text-slate-500">Available 24/7 for critical maritime operations.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Contact Form */}
-                            <div className="flex-1 bg-slate-50 p-12 rounded-3xl border border-slate-100 shadow-premium relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-grpsi-gold/5 rounded-full blur-3xl" />
-                                <SectionHeading title="Send a Message" subtitle="Enquiry" />
-
-                                {isSubmitted ? (
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="bg-white p-12 rounded-2xl text-center shadow-lg"
-                                    >
-                                        <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                                            <Send className="w-10 h-10" />
-                                        </div>
-                                        <h3 className="text-2xl font-bold text-grpsi-blue mb-4">Message Received!</h3>
-                                        <p className="text-slate-500">Our team will get back to you within 24 hours.</p>
-                                    </motion.div>
-                                ) : (
-                                    <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-bold text-grpsi-blue uppercase tracking-widest">Full Name</label>
-                                                <input
-                                                    required
-                                                    type="text"
-                                                    className="w-full px-6 py-4 rounded-xl border border-slate-200 focus:border-grpsi-blue focus:ring-2 focus:ring-grpsi-blue/20 outline-none transition-all"
-                                                    placeholder="John Doe"
-                                                    value={formState.name}
-                                                    onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-bold text-grpsi-blue uppercase tracking-widest">Email Address</label>
-                                                <input
-                                                    required
-                                                    type="email"
-                                                    className="w-full px-6 py-4 rounded-xl border border-slate-200 focus:border-grpsi-blue focus:ring-2 focus:ring-grpsi-blue/20 outline-none transition-all"
-                                                    placeholder="john@example.com"
-                                                    value={formState.email}
-                                                    onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-bold text-grpsi-blue uppercase tracking-widest">Subject</label>
-                                            <select
-                                                className="w-full px-6 py-4 rounded-xl border border-slate-200 focus:border-grpsi-blue outline-none appearance-none bg-white"
-                                                value={formState.subject}
-                                                onChange={(e) => setFormState({ ...formState, subject: e.target.value })}
-                                            >
-                                                <option value="">Select a Topic</option>
-                                                <option value="logistics">Logistics Inquiry</option>
-                                                <option value="engineering">Engineering Project</option>
-                                                <option value="fuel">Fuel Logistics</option>
-                                                <option value="other">Other Inquiry</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-bold text-grpsi-blue uppercase tracking-widest">Message</label>
-                                            <textarea
-                                                required
-                                                rows={5}
-                                                className="w-full px-6 py-4 rounded-xl border border-slate-200 focus:border-grpsi-blue outline-none resize-none"
-                                                placeholder="How can we help you?"
-                                                value={formState.message}
-                                                onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                                            />
-                                        </div>
-                                        <button className="w-full bg-grpsi-blue text-white py-5 rounded-xl font-bold uppercase tracking-[0.2em] shadow-xl hover:bg-grpsi-blue-light hover:shadow-2xl active:scale-95 transition-all">
-                                            Submit Inquiry
-                                        </button>
-                                    </form>
-                                )}
-                            </div>
-                        </div>
+                    <div className={cn(surface.card, "lg:col-span-3 p-6 sm:p-8")}>
+                        <h2 className="text-xl font-bold text-grpsi-blue mb-6">Send us a message</h2>
+                        <Suspense fallback={<div className="h-96" />}>
+                            <ContactForm to={footer.email} />
+                        </Suspense>
                     </div>
-                </section>
-
-                {/* Global Operations Section */}
-                <section className="py-24 bg-slate-100 border-t border-slate-100 px-6">
-                    <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
-                        <div className="flex gap-6 items-center">
-                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                <Globe className="w-8 h-8 text-grpsi-blue" />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-grpsi-blue whitespace-nowrap">Nationwide Network</h4>
-                                <p className="text-slate-500">Serving all 9 provinces from the Shortlands to Temotu.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <button className="bg-white text-grpsi-blue border border-slate-200 px-8 py-3 rounded-full font-bold uppercase text-xs tracking-widest hover:border-grpsi-blue transition-colors">Download Port Guide</button>
-                            <button className="bg-white text-grpsi-blue border border-slate-200 px-8 py-3 rounded-full font-bold uppercase text-xs tracking-widest hover:border-grpsi-blue transition-colors">Emergency Protocols</button>
-                        </div>
-                    </div>
-                </section>
-            </main>
-
-
+                </div>
+            </Container>
         </>
     );
 }

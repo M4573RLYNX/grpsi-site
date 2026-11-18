@@ -1,88 +1,100 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Mail, Phone, MapPin, Globe, Ship, Users } from "lucide-react";
+import Image from "next/image";
+import { Globe, Mail, MapPin, Phone } from "lucide-react";
+import type { FooterContent } from "@/lib/types";
+import { resolveIcon } from "./icons";
+import { Container, Eyebrow, cn, focusRing, telHref } from "./ui";
 
-export default function Footer() {
-  const [data, setData] = useState<any>(null);
+const LINKS = [
+    { label: "About", href: "/about" },
+    { label: "Services", href: "/services" },
+    { label: "Projects", href: "/projects" },
+    { label: "Contact", href: "/contact" },
+];
 
-  useEffect(() => {
-    const fetchFooter = async () => {
-        try {
-            const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
-            const url = apiBase.endsWith('/api') ? `${apiBase}/content` : `${apiBase}/api/content`;
-            
-            const res = await fetch(url);
-            const allData = await res.json();
-            setData(allData.footer);
-        } catch (err) {
-            console.error("Footer sync failed");
-        }
-    };
-    fetchFooter();
-  }, []);
+export default function Footer({ footer }: { footer: FooterContent }) {
+    const social = footer.social.filter((s) => /^https?:\/\//.test(s.url));
+    const year = new Date().getFullYear();
 
-  const footer = data || {
-    description: "Leading provider of logistical support and specialized services in the Solomon Islands. Dedicated to regional development through maritime and engineering excellence.",
-    address: "Kukum Highway, Honiara, Solomon Islands",
-    email: "info@grpsi.com",
-    phone: "+677 24567"
-  };
+    return (
+        <footer className="px-3 sm:px-4 pb-3 sm:pb-4 mt-8">
+            <div className="mx-auto max-w-[1400px] rounded-[32px] bg-grpsi-blue text-white overflow-hidden relative">
+                <div aria-hidden className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-grpsi-blue-light/40 blur-3xl" />
+                <Container className="relative py-14 sm:py-16">
+                    <div className="grid gap-10 md:grid-cols-12">
+                        <div className="md:col-span-5 space-y-5">
+                            <Image src="/logo.png" alt="GPRSI" width={200} height={26} className="h-7 w-auto" />
+                            {footer.description && <p className="text-white/70 leading-relaxed max-w-md">{footer.description}</p>}
+                            {social.length > 0 && (
+                                <ul className="flex gap-2">
+                                    {social.map((s, i) => {
+                                        const Icon = resolveIcon(s.platform, Globe);
+                                        return (
+                                            <li key={i}>
+                                                <a
+                                                    href={s.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    aria-label={`${s.platform} (opens in new tab)`}
+                                                    className={cn(focusRing, "h-10 w-10 rounded-xl bg-white/10 ring-1 ring-white/15 flex items-center justify-center hover:bg-grpsi-gold hover:text-grpsi-blue transition-all focus-visible:ring-white")}
+                                                >
+                                                    <Icon className="w-4 h-4" aria-hidden />
+                                                </a>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
 
-  const icons:Record<string, any> = { Globe, Ship, Users };
+                        <nav aria-label="Footer" className="md:col-span-3">
+                            <Eyebrow onDark className="mb-4">Explore</Eyebrow>
+                            <ul className="space-y-2.5">
+                                {LINKS.map((l) => (
+                                    <li key={l.href}>
+                                        <Link href={l.href} className="text-white/80 hover:text-grpsi-gold transition-colors">
+                                            {l.label}
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </nav>
 
-  return (
-    <footer className="bg-slate-50 border-t border-slate-100 pt-24 pb-12 font-sans">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="grid md:grid-cols-4 gap-12 mb-20">
-                <div className="col-span-2">
-                    <div className="text-3xl font-bold text-grpsi-blue mb-6 tracking-tighter">GPRSI</div>
-                    <p className="text-slate-500 max-w-md mb-8 leading-relaxed">
-                        {footer.description}
-                    </p>
-                    <div className="flex gap-4">
-                        {(footer.social || [{platform: "Globe", url: "#"}, {platform: "Ship", url: "#"}, {platform: "Users", url: "#"}]).map((item: any, i: number) => {
-                            const Icon = icons[item.platform] || Globe;
-                            return (
-                                <a key={i} href={item.url} className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-grpsi-blue hover:border-grpsi-blue transition-all shadow-sm">
-                                    <Icon className="w-5 h-5" />
-                                </a>
-                            );
-                        })}
+                        <div className="md:col-span-4">
+                            <Eyebrow onDark className="mb-4">Get in touch</Eyebrow>
+                            <ul className="space-y-3 text-white/80">
+                                {footer.address && (
+                                    <li className="flex gap-3">
+                                        <MapPin className="w-5 h-5 text-grpsi-gold shrink-0" aria-hidden />
+                                        <span>{footer.address}</span>
+                                    </li>
+                                )}
+                                {footer.phone && (
+                                    <li>
+                                        <a href={telHref(footer.phone)} className="flex gap-3 hover:text-grpsi-gold transition-colors">
+                                            <Phone className="w-5 h-5 text-grpsi-gold shrink-0" aria-hidden />
+                                            {footer.phone}
+                                        </a>
+                                    </li>
+                                )}
+                                {footer.email && (
+                                    <li>
+                                        <a href={`mailto:${footer.email}`} className="flex gap-3 hover:text-grpsi-gold transition-colors break-all">
+                                            <Mail className="w-5 h-5 text-grpsi-gold shrink-0" aria-hidden />
+                                            {footer.email}
+                                        </a>
+                                    </li>
+                                )}
+                            </ul>
+                        </div>
                     </div>
-                </div>
-                <div>
-                    <h4 className="font-bold text-grpsi-blue mb-6 uppercase text-sm tracking-widest">Links</h4>
-                    <ul className="space-y-4 text-slate-500">
-                        <li><Link href="/about" className="hover:text-grpsi-blue transition-colors">Our Story</Link></li>
-                        <li><Link href="/services" className="hover:text-grpsi-blue transition-colors">Services</Link></li>
-                        <li><Link href="/contact" className="hover:text-grpsi-blue transition-colors">Get Started</Link></li>
-                        <li><a href="#" className="hover:text-grpsi-blue transition-colors">Careers</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 className="font-bold text-grpsi-blue mb-6 uppercase text-sm tracking-widest">Headquarters</h4>
-                    <ul className="space-y-4 text-slate-500 text-sm md:text-base">
-                        <li className="flex gap-3">
-                            <MapPin className="w-5 h-5 text-grpsi-gold shrink-0 border-none" />
-                            <span>{footer.address}</span>
-                        </li>
-                        <li className="flex gap-3">
-                            <Mail className="w-5 h-5 text-grpsi-gold shrink-0" />
-                            <span>{footer.email}</span>
-                        </li>
-                        <li className="flex gap-3">
-                            <Phone className="w-5 h-5 text-grpsi-gold shrink-0" />
-                            <span>{footer.phone}</span>
-                        </li>
-                    </ul>
-                </div>
+
+                    <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-2 justify-between text-sm text-white/50">
+                        <p>© {year} GRP & Associates Ltd. All rights reserved.</p>
+                        <p>Honiara, Solomon Islands</p>
+                    </div>
+                </Container>
             </div>
-            <div className="pt-8 border-t border-slate-200 text-center text-slate-400 text-xs md:text-sm">
-                <p>© {new Date().getFullYear()} GRP & Associates Ltd. Delivering Excellence Across the Islands.</p>
-            </div>
-        </div>
-    </footer>
-  );
+        </footer>
+    );
 }
