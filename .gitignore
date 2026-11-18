@@ -1,0 +1,5 @@
+.env
+.env.*
+!.env.example
+backend/data/backup-*.json
+frontend/.next/

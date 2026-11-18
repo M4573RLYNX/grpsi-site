@@ -3,9 +3,10 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
+const { neon } = require('@neondatabase/serverless');
 const { kv } = process.env.KV_URL ? require('@vercel/kv') : { kv: null };
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -13,13 +14,26 @@ const DB_PATH = path.join(__dirname, 'data', 'db.json');
 const JWT_SECRET = process.env.JWT_SECRET || 'gprsi-maritime-secret-2024';
 
 const IS_CLOUD = !!process.env.KV_URL;
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
 
 // --- HYBRID DATA LAYER ---
+// Priority: Neon Postgres (DATABASE_URL) -> Vercel KV (KV_URL) -> local db.json
 
-// Global Content Key for Vercel KV
+// Content key (Neon row key / Vercel KV key)
 const MARITIME_DATA_KEY = 'gprsi_site_content';
+const EMPTY_DB = () => ({ about: {}, services: [], projects: [], home: {}, footer: {} });
 
 const readDB = async () => {
+    if (sql) {
+        try {
+            const rows = await sql`SELECT data FROM site_content WHERE key = ${MARITIME_DATA_KEY}`;
+            return rows[0]?.data || EMPTY_DB();
+        } catch (err) {
+            console.error("Neon Retrieval Error:", err);
+            return EMPTY_DB();
+        }
+    }
+
     if (IS_CLOUD && kv) {
         try {
             const data = await kv.get(MARITIME_DATA_KEY);
@@ -41,6 +55,19 @@ const readDB = async () => {
 };
 
 const writeDB = async (data) => {
+    if (sql) {
+        try {
+            await sql`
+                INSERT INTO site_content (key, data, updated_at)
+                VALUES (${MARITIME_DATA_KEY}, ${JSON.stringify(data)}::jsonb, now())
+                ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`;
+            return true;
+        } catch (err) {
+            console.error("Neon Sync Error:", err);
+            return false;
+        }
+    }
+
     if (IS_CLOUD && kv) {
         try {
             await kv.set(MARITIME_DATA_KEY, data);
